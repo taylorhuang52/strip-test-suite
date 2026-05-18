@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StripTest">
+<meta name="theme-color" content="#1167a8">
+<title>Strip Test Suite</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root {
+  --bg: #0f1117;
+  --panel: #181c27;
+  --card: #1e2333;
+  --accent: #4682d2;
+  --accent2: #5b9cf6;
+  --text: #dce3f0;
+  --text2: #8a95b0;
+  --ok: #34c77b;
+  --border: #2d3450;
+  --warn: #f0a020;
+  --danger: #e05050;
+  --radius: 14px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, "Segoe UI", "Microsoft JhengHei", sans-serif;
+  background: var(--bg); color: var(--text);
+  display: flex; flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bot);
+}
+
+/* ── Header ── */
+.app-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.app-logo {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--accent); display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.app-logo svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.app-title { font-size: 17px; font-weight: 700; color: var(--text); letter-spacing: .3px; }
+.app-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.version-badge {
+  margin-left: auto; font-size: 10px; font-weight: 700;
+  background: var(--border); color: var(--text2);
+  padding: 3px 9px; border-radius: 20px; white-space: nowrap;
+}
+
+/* ── Scrollable content ── */
+.scroll-body {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 16px 14px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Card ── */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+  margin-bottom: 14px;
+}
+.card-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .8px;
+  text-transform: uppercase; color: var(--text2);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.card-label svg { width: 13px; height: 13px; stroke: var(--accent2); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ── Drop zone ── */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  background: rgba(70,130,210,.04);
+  position: relative;
+}
+.drop-zone.active { border-color: var(--accent); background: rgba(70,130,210,.10); }
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-icon {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(70,130,210,.15);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 10px;
+}
+.drop-icon svg { width: 26px; height: 26px; stroke: var(--accent2); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.drop-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.drop-hint { font-size: 12px; color: var(--text2); }
+
+/* ── File chips ── */
+.file-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(70,130,210,.14); border: 1px solid rgba(70,130,210,.25);
+  border-radius: 20px; padding: 4px 10px;
+  font-size: 12px; font-weight: 500; color: var(--accent2);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chip svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
+
+/* ── Action buttons ── */
+.btn-row { display: flex; flex-direction: column; gap: 10px; }
+.btn {
+  width: 100%; padding: 15px 18px;
+  border: none; border-radius: 10px;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px;
+  transition: opacity .15s, transform .1s;
+  letter-spacing: .2px;
+}
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn:not(:disabled):active { transform: scale(.97); }
+.btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-green   { background: #1a7a4a; color: #fff; }
+.btn-orange  { background: #b5451b; color: #fff; }
+.btn-purple  { background: #6b3fa0; color: #fff; }
+
+/* ── Progress bar ── */
+.progress-wrap { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; display: none; }
+.progress-wrap.show { display: block; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 4px; width: 0%; transition: width .25s ease; }
+
+/* ── Status badges ── */
+.status-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.stat-pill {
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px; flex: 1; min-width: 70px;
+}
+.stat-num { font-size: 22px; font-weight: 800; color: var(--accent2); line-height: 1; }
+.stat-lbl { font-size: 10px; color: var(--text2); margin-top: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+
+/* ── Log ── */
+.log-area {
+  background: #0a0c12; border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px;
+  height: 160px; overflow-y: auto;
+  font-family: 'Menlo','Consolas',monospace; font-size: 11.5px;
+  color: #7dffb3; line-height: 1.6;
+  -webkit-overflow-scrolling: touch;
+}
+.log-err { color: #ff7b7b; }
+
+/* ── Slot heatmap grid (inline, no modal) ── */
+.slot-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px;
+  margin-top: 10px;
+}
+.slot-cell {
+  border-radius: 7px; padding: 6px 2px;
+  text-align: center; font-size: 10px; line-height: 1.3;
+}
+.slot-cell .sid { font-weight: 800; font-size: 11px; display: block; }
+.slot-cell .sval { display: block; font-size: 10px; }
+.slot-empty { background: #232840; color: #444; }
+
+/* ── Legend ── */
+.legend-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; color: var(--text2); }
+.legend-bar { height: 10px; flex: 1; border-radius: 3px; background: linear-gradient(to right,#c0392b,#e67e22,#f1c40f,#27ae60); }
+
+/* ── Login overlay ── */
+#loginOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(150deg,#0d1120 0%,#1a253a 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.login-box {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 40px 28px;
+  width: 100%; max-width: 340px; text-align: center;
+}
+.login-logo {
+  width: 64px; height: 64px; border-radius: 18px;
+  background: var(--accent); display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px;
+}
+.login-logo svg { width: 34px; height: 34px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.login-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: var(--text2); margin-bottom: 28px; }
+.login-input {
+  width: 100%; padding: 14px 16px;
+  background: var(--panel); border: 1.5px solid var(--border);
+  border-radius: 10px; color: var(--text);
+  font-size: 16px; outline: none;
+  transition: border .2s; margin-bottom: 10px;
+  -webkit-appearance: none;
+}
+.login-input:focus { border-color: var(--accent); }
+.login-err { color: #ff7b7b; font-size: 13px; min-height: 20px; margin-bottom: 8px; }
+.login-btn {
+  width: 100%; padding: 14px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 10px;
+  font-size: 16px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s;
+}
+.login-btn:active { opacity: .8; }
+
+/* ── Install banner ── */
+#installBanner {
+  display: none; align-items: center; gap: 10px;
+  background: rgba(70,130,210,.15); border: 1px solid rgba(70,130,210,.3);
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 14px;
+  font-size: 13px;
+}
+#installBanner.show { display: flex; }
+#installBanner svg { width: 18px; height: 18px; stroke: var(--accent2); fill: none; stroke-width: 2; flex-shrink: 0; }
+.install-text { flex: 1; }
+.install-text strong { display: block; font-size: 13px; }
+.install-text span { font-size: 11px; color: var(--text2); }
+.install-btn {
+  background: var(--accent); color: #fff; border: none;
+  padding: 7px 14px; border-radius: 7px; font-size: 13px;
+  font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+
+@media (min-width: 600px) {
+  .btn-row { flex-direction: row; flex-wrap: wrap; }
+  .btn { width: auto; flex: 1; min-width: 160px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN OVERLAY ══ -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <div class="login-title">Strip Test Suite</div>
+    <div class="login-sub">請輸入密碼以繼續</div>
+    <input id="loginInput" class="login-input" type="password" placeholder="輸入密碼"
+      onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="loginErr" class="login-err"></div>
+    <button class="login-btn" onclick="doLogin()">登入</button>
+  </div>
+</div>
+
+<!-- ══ APP HEADER ══ -->
+<div class="app-header">
+  <div class="app-logo">
+    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+  </div>
+  <div>
+    <div class="app-title">Strip Test Suite</div>
+    <div class="app-sub">Report Generator</div>
+  </div>
+  <div class="version-badge">v2.1 PWA</div>
+</div>
+
+<!-- ══ SCROLL BODY ══ -->
+<div class="scroll-body">
+
+  <!-- Install banner (Android Chrome) -->
+  <div id="installBanner">
+    <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/><path d="M12 8v8M8 12l4 4 4-4"/></svg>
+    <div class="install-text">
+      <strong>加入主畫面</strong>
+      <span>像 App 一樣使用</span>
+    </div>
+    <button class="install-btn" id="installBtn">安裝</button>
+  </div>
+
+  <!-- File picker -->
+  <div class="card">
+    <div class="card-label">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      選取 Log 檔案
+    </div>
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" multiple accept=".xls,.xlsx,.zip">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="drop-title" id="dropTitle">點擊選取或拖曳檔案</div>
+      <div class="drop-hint">支援 .xls / .xlsx / .zip</div>
+    </div>
+    <div class="file-chips" id="fileChips"></div>
+  </div>
+
+  <!-- Actions -->
+  <div class="card">
+    <div class="card-label">
+      <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      執行
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btnProcess" disabled>
+        <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        解析數據
+      </button>
+      <button class="btn btn-green" id="btnExport" disabled>
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        匯出 Summary
+      </button>
+      <button class="btn btn-orange" id="btnAutoFailHeatmap" disabled>
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M12 8v4l3 3"/></svg>
+        Fail Heatmap
+      </button>
+      <button class="btn btn-purple" id="btnHeatmap" disabled>
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Slot Heatmap
+      </button>
+    </div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="card" id="statsCard" style="display:none">
+    <div class="card-label">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      解析結果
+    </div>
+    <div class="status-row">
+      <div class="stat-pill"><div class="stat-num" id="statLots">0</div><div class="stat-lbl">Lots</div></div>
+      <div class="stat-pill"><div class="stat-num" id="statInput">0</div><div class="stat-lbl">Input</div></div>
+      <div class="stat-pill"><div class="stat-num" id="statOutput">0</div><div class="stat-lbl">Output</div></div>
+      <div class="stat-pill"><div class="stat-num" id="statYield">—</div><div class="stat-lbl">Yield</div></div>
+    </div>
+  </div>
+
+  <!-- Slot Heatmap (inline) -->
+  <div class="card" id="slotHeatmapCard" style="display:none">
+    <div class="card-label">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Slot Yield Heatmap
+    </div>
+    <div class="slot-grid" id="slotGrid"></div>
+    <div class="legend-row">
+      <span>低</span>
+      <div class="legend-bar"></div>
+      <span>高</span>
+      <span style="margin-left:8px;font-size:10px;color:var(--text2)">紅&lt;80% 橙80-90% 黃90-95% 綠≥95%</span>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <div class="card-label">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      執行紀錄
+    </div>
+    <div class="log-area" id="logArea">準備就緒...</div>
+  </div>
+
+</div><!-- /scroll-body -->
+
+<script>
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+(function(){
+  const PASS="stp2026", KEY="stp_auth";
+  if(sessionStorage.getItem(KEY)===PASS){
+    document.getElementById("loginOverlay").style.display="none";
+  }
+  window.doLogin=function(){
+    const val=document.getElementById("loginInput").value;
+    if(val===PASS){
+      sessionStorage.setItem(KEY,PASS);
+      const ov=document.getElementById("loginOverlay");
+      ov.style.transition="opacity .35s";ov.style.opacity="0";
+      setTimeout(()=>ov.style.display="none",350);
+    }else{
+      const err=document.getElementById("loginErr");
+      err.textContent="密碼錯誤，請再試一次。";
+      const inp=document.getElementById("loginInput");
+      inp.style.borderColor="#e05050";inp.value="";inp.focus();
+      setTimeout(()=>{err.textContent="";inp.style.borderColor="";},2500);
+    }
+  };
+})();
+
+// ── PWA SERVICE WORKER ────────────────────────────────────────────────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+// ── PWA INSTALL PROMPT (Android Chrome) ───────────────────────────────────────
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault(); deferredPrompt=e;
+  document.getElementById('installBanner').classList.add('show');
+});
+document.getElementById('installBtn').onclick=async()=>{
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  const{outcome}=await deferredPrompt.userChoice;
+  deferredPrompt=null;
+  document.getElementById('installBanner').classList.remove('show');
+};
+window.addEventListener('appinstalled',()=>{
+  document.getElementById('installBanner').classList.remove('show');
+});
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const TARGET_SHEET="LoggerData";
+const UNITS_PER_SLOT=169;
+const ROW_MIN=3,ROW_MAX=4,ROW_HEADER=9,ROW_DATA=10;
+const JUDGED_ITEMS=["VTH","VFSD","BVDSS 2","BVDSS 1","Delta3","IPD-10V","IDSS1","IDSS2","IDSS3"];
+const SLOTS=Array.from({length:24},(_,i)=>(i+1).toString().padStart(2,'0'));
+const FAIL_PARAM_CSV_MAP={"VTH":"VTH","VFSD":"VFSD","BVDSS 2":"BVDSS_2","BVDSS 1":"BVDSS_1","Delta3":"Delta3","IPD-10V":"IPD_10V","IDSS1":"IDSS1","IDSS2":"IDSS2","IDSS3":"IDSS3"};
+const FAIL_PARAM_LIMITS={VTH:[1.5,6.0],VFSD:[0.4,0.9],BVDSS_2:[19.65,23.0],BVDSS_1:[19.65,22.5],Delta3:[0.02,2.0],IPD_10V:[20.0,40.0],IDSS1:[0.0,10.0],IDSS2:[0.0,10.0],IDSS3:[0.0,10.0]};
+
+let finalResults=[],rptFiles=[],rptEntries=[];
+
+// ── FILE DRAG & DROP ──────────────────────────────────────────────────────────
+['dragenter','dragover','dragleave','drop'].forEach(e=>window.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();}));
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.addEventListener('click',()=>fileInput.click());
+dropZone.addEventListener('dragover',()=>dropZone.classList.add('active'));
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('active'));
+dropZone.addEventListener('drop',e=>{dropZone.classList.remove('active');onFiles(e.dataTransfer.files);});
+fileInput.addEventListener('change',e=>onFiles(e.target.files));
+
+function onFiles(f){
+  rptFiles=Array.from(f);
+  if(!rptFiles.length)return;
+  document.getElementById('dropTitle').textContent=`已選取 ${rptFiles.length} 個檔案`;
+  document.getElementById('btnProcess').disabled=false;
+  const chips=document.getElementById('fileChips');
+  chips.innerHTML='';
+  rptFiles.slice(0,6).forEach(f=>{
+    const chip=document.createElement('div');chip.className='chip';
+    chip.innerHTML=`<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${f.name}`;
+    chips.appendChild(chip);
+  });
+  if(rptFiles.length>6){const more=document.createElement('div');more.className='chip';more.textContent=`+${rptFiles.length-6} 個`;chips.appendChild(more);}
+}
+
+// ── LOG ───────────────────────────────────────────────────────────────────────
+function addLog(msg,isError=false){
+  const area=document.getElementById('logArea');
+  const d=document.createElement('div');
+  if(isError)d.className='log-err';
+  d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  area.appendChild(d);area.scrollTop=area.scrollHeight;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function isExcelFile(n){return/\.(xls|xlsx)$/i.test(n);}
+function isZipFile(n){return/\.zip$/i.test(n);}
+function baseName(n){return n.replace(/^.*[\\\/]/,'').replace(/\.(xls|xlsx)$/i,'');}
+function getSheetName(wb,target){return wb.SheetNames.find(s=>s.trim().toLowerCase()===target.toLowerCase())||null;}
+function parseLimit(raw){if(raw==null||raw===undefined)return null;const m=String(raw).trim().match(/[-+]?\d*\.?\d+/);return m?Number(m[0]):null;}
+function toNumber(raw){if(raw==null||raw===''||raw===undefined)return null;if(typeof raw==='number')return Number.isFinite(raw)?raw:null;const n=Number(String(raw).trim().replace(/,/g,''));return Number.isFinite(n)?n:null;}
+function extractSubBatch(remark){if(remark==null||remark===undefined)return null;const parts=String(remark).trim().split(/\s+/).filter(Boolean);if(parts.length<2)return null;const code=parts[parts.length-1];return code.length>=2?code.slice(-2):null;}
+function formatFileTime(file){if(!file.lastModified)return'';const d=new Date(file.lastModified);const pad=n=>String(n).padStart(2,'0');return`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}${pad(d.getSeconds())}`;}
+function todayStr(){const d=new Date();const pad=n=>String(n).padStart(2,'0');return`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;}
+function setProgress(pct){document.getElementById('progressBar').style.width=pct+'%';}
+function showProgress(show){document.getElementById('progressWrap').classList.toggle('show',show);}
+
+// ── COLLECT ENTRIES ───────────────────────────────────────────────────────────
+async function collectExcelEntries(inputFiles){
+  const entries=[];
+  for(const file of inputFiles){
+    if(isExcelFile(file.name)){entries.push({name:file.name,data:await file.arrayBuffer(),lastModified:file.lastModified});continue;}
+    if(isZipFile(file.name)){
+      const zip=await JSZip.loadAsync(await file.arrayBuffer());
+      const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir&&isExcelFile(n));
+      for(const n of names)entries.push({name:n,data:await zip.files[n].async('arraybuffer'),lastModified:zip.files[n].date?zip.files[n].date.getTime():file.lastModified});
+      continue;
+    }
+    addLog(`跳過 [${file.name}]: 不支援的格式`,true);
+  }
+  return entries;
+}
+
+// ── PARSE WORKBOOK ────────────────────────────────────────────────────────────
+function parseWorkbook(entry){
+  const wb=XLSX.read(entry.data,{type:'array',cellDates:false});
+  const sheetName=getSheetName(wb,TARGET_SHEET);
+  if(!sheetName)throw new Error(`Sheet '${TARGET_SHEET}' not found.`);
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+  if(rows.length<=ROW_HEADER)throw new Error('Insufficient rows.');
+  const headers=rows[ROW_HEADER].map(h=>String(h).trim());
+  const col={};headers.forEach((h,i)=>{if(h&&col[h.toLowerCase()]===undefined)col[h.toLowerCase()]=i;});
+  const colIdx=name=>col[name.toLowerCase()];
+  const minRow=rows[ROW_MIN]||[],maxRow=rows[ROW_MAX]||[];
+  const limits={};
+  JUDGED_ITEMS.forEach(item=>{const ci=colIdx(item);if(ci!==undefined)limits[item]={min:parseLimit(minRow[ci]),max:parseLimit(maxRow[ci])};});
+  const vthCol=colIdx('VTH'),remarkCol=colIdx('Remark');
+  const failCounts={};JUDGED_ITEMS.forEach(it=>failCounts[it]=0);
+  const subPass={};let input=0,output=0,vthLt15=0,vthGt6=0;
+  for(let r=ROW_DATA;r<rows.length;r++){
+    const row=rows[r]||[];
+    if(String(row[0]??'').trim()==='')break;
+    input++;
+    const vth=vthCol!==undefined?toNumber(row[vthCol]):null;
+    if(vth!==null){if(vth<1.5)vthLt15++;if(vth>6.0)vthGt6++;}
+    let diePassed=true;
+    JUDGED_ITEMS.forEach(item=>{
+      const ci=colIdx(item),lim=limits[item];
+      if(ci===undefined||!lim)return;
+      const val=toNumber(row[ci]);
+      const failed=val===null||(lim.min!==null&&val<lim.min)||(lim.max!==null&&val>lim.max);
+      if(failed){failCounts[item]++;diePassed=false;}
+    });
+    if(diePassed)output++;
+    const sub=remarkCol!==undefined?extractSubBatch(row[remarkCol]):null;
+    if(sub){if(subPass[sub]===undefined)subPass[sub]=0;if(diePassed)subPass[sub]++;}
+  }
+  const subBatchYield={};
+  Object.entries(subPass).forEach(([slot,pass])=>{subBatchYield[slot]=pass/UNITS_PER_SLOT;});
+  return{fileName:entry.name.replace(/^.*[\\\/]/,''),lotNo:baseName(entry.name),testDateTime:formatFileTime(entry),input,output,vthLt15,vthGt6,failCounts,subBatchYield};
+}
+
+// ── PROCESS ───────────────────────────────────────────────────────────────────
+document.getElementById('btnProcess').onclick=async()=>{
+  finalResults=[];
+  ['btnExport','btnHeatmap','btnAutoFailHeatmap'].forEach(id=>document.getElementById(id).disabled=true);
+  document.getElementById('statsCard').style.display='none';
+  document.getElementById('slotHeatmapCard').style.display='none';
+  document.getElementById('logArea').innerHTML='';
+  showProgress(true);setProgress(10);
+
+  let entries=[];
+  try{entries=await collectExcelEntries(rptFiles);rptEntries=entries;}
+  catch(err){addLog(`讀取失敗: ${err.message}`,true);showProgress(false);return;}
+
+  const total=entries.length;
+  for(let i=0;i<entries.length;i++){
+    const entry=entries[i];
+    try{const result=parseWorkbook(entry);finalResults.push(result);addLog(`✓ ${result.fileName}  Input:${result.input}  Output:${result.output}`);}
+    catch(err){addLog(`✗ ${entry.name}: ${err.message}`,true);}
+    setProgress(10+Math.round((i+1)/total*80));
+  }
+  setProgress(100);
+  setTimeout(()=>showProgress(false),600);
+
+  const ok=finalResults.length>0;
+  ['btnExport','btnHeatmap','btnAutoFailHeatmap'].forEach(id=>document.getElementById(id).disabled=!ok);
+
+  if(ok){
+    const totalInput=finalResults.reduce((s,d)=>s+d.input,0);
+    const totalOutput=finalResults.reduce((s,d)=>s+d.output,0);
+    document.getElementById('statLots').textContent=finalResults.length;
+    document.getElementById('statInput').textContent=totalInput;
+    document.getElementById('statOutput').textContent=totalOutput;
+    document.getElementById('statYield').textContent=totalInput>0?((totalOutput/totalInput)*100).toFixed(1)+'%':'—';
+    document.getElementById('statsCard').style.display='block';
+    addLog(`✅ 完成 ${finalResults.length} 個 lot`);
+  }
+};
+
+// ── EXPORT XLSX ───────────────────────────────────────────────────────────────
+document.getElementById('btnExport').onclick=async()=>{
+  const btn=document.getElementById('btnExport');
+  btn.disabled=true;
+  try{
+    const wbEx=new ExcelJS.Workbook();
+    const ws=wbEx.addWorksheet('Summary');
+    const sorted=[...finalResults].sort((a,b)=>a.lotNo.localeCompare(b.lotNo,undefined,{sensitivity:'base'}));
+    const reportDate=new Date();
+    const headerArr=["Test Date/ Time","Report Date","Lot No.","Input","Output","Yield","VTH","","VTH < 1.5 V","","VTH > 6 V","","VFSD","","BVDSS 2","","BVDSS 1","","Delta3","","IPD-10V","","IDSS1","","IDSS2","","IDSS3","",...SLOTS];
+    const r1=ws.addRow(headerArr);
+    r1.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'4472C4'}};c.font={color:{argb:'FFFFFF'},bold:true};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border={bottom:{style:'thin',color:{argb:'2255A0'}}};});
+    [[7,8],[9,10],[11,12],[13,14],[15,16],[17,18],[19,20],[21,22],[23,24],[25,26],[27,28]].forEach(([f,t])=>{ws.mergeCells(1,f,1,t);});
+    for(let c=29;c<=52;c++){const cell=ws.getCell(1,c);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'70AD47'}};cell.font={color:{argb:'FFFFFF'},bold:true};cell.alignment={horizontal:'center'};}
+    const RED_FILL={type:'pattern',pattern:'solid',fgColor:{argb:'C00000'}};
+    const YEL_FONT={color:{argb:'FFFF00'},bold:true};
+    sorted.forEach((d,idx)=>{
+      const yieldVal=d.input>0?d.output/d.input:0;
+      const pair=count=>[count,d.input>0?count/d.input:0];
+      const rowData=[d.testDateTime,reportDate,d.lotNo,d.input,d.output,yieldVal,...pair(d.failCounts["VTH"]||0),...pair(d.vthLt15),...pair(d.vthGt6),...pair(d.failCounts["VFSD"]||0),...pair(d.failCounts["BVDSS 2"]||0),...pair(d.failCounts["BVDSS 1"]||0),...pair(d.failCounts["Delta3"]||0),...pair(d.failCounts["IPD-10V"]||0),...pair(d.failCounts["IDSS1"]||0),...pair(d.failCounts["IDSS2"]||0),...pair(d.failCounts["IDSS3"]||0),...SLOTS.map(s=>d.subBatchYield[s]!==undefined?d.subBatchYield[s]:'')];
+      const r=ws.addRow(rowData);
+      r.getCell(2).numFmt='yyyy/mm/dd';r.getCell(6).numFmt='0.00%';
+      for(let c=8;c<=28;c+=2)r.getCell(c).numFmt='0.00%';
+      for(let c=29;c<=52;c++)r.getCell(c).numFmt='0.00%';
+      if(idx%2===0){r.eachCell({includeEmpty:true},c=>{if(!c.fill||c.fill.pattern==='none'){c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'DCE6F1'}};}});}
+      if(yieldVal<0.90){const yc=r.getCell(6);yc.fill=RED_FILL;yc.font=YEL_FONT;}
+      [8,10,12,14,16,18,20,22,24,26,28].forEach(ci=>{const cell=r.getCell(ci);const val=cell.value;if(typeof val==='number'&&val>0.01){cell.fill=RED_FILL;cell.font=YEL_FONT;}});
+      for(let c=29;c<=52;c++){const cell=r.getCell(c);const v=cell.value;if(typeof v==='number'){let argb;if(v<0.80)argb='FFC00000';else if(v<0.90)argb='FFE67E22';else if(v<0.95)argb='FFF1C40F';else argb='FF27AE60';cell.fill={type:'pattern',pattern:'solid',fgColor:{argb}};cell.font={color:{argb:v<0.95?'FF000000':'FFFFFFFF'},bold:v<0.90};}}
+    });
+    ws.columns.forEach((c,i)=>{if(i===0||i===1)c.width=14;else if(i===2)c.width=24;else c.width=i>=28?8:10;});
+    ws.views=[{state:'frozen',ySplit:1}];
+    ws.autoFilter={from:'A1',to:'AZ1'};
+    const buf=await wbEx.xlsx.writeBuffer();
+    const blob=new Blob([buf]);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ULLD_Strip_Test_Summary_${todayStr()}.xlsx`;a.click();
+    addLog(`✅ 已下載 ULLD_Strip_Test_Summary_${todayStr()}.xlsx`);
+  }catch(err){addLog(`匯出失敗: ${err.message}`,true);}
+  finally{btn.disabled=false;}
+};
+
+// ── SLOT HEATMAP (inline) ─────────────────────────────────────────────────────
+function slotColor(v){if(v===null||v===undefined||v==='')return null;if(v<0.80)return{bg:'#c0392b',fg:'#fff'};if(v<0.90)return{bg:'#e67e22',fg:'#fff'};if(v<0.95)return{bg:'#b5a000',fg:'#000'};return{bg:'#1a7a4a',fg:'#fff'};}
+
+document.getElementById('btnHeatmap').onclick=()=>{
+  const grid=document.getElementById('slotGrid');
+  grid.innerHTML='';
+  const slotSums={},slotCounts={};
+  SLOTS.forEach(s=>{slotSums[s]=0;slotCounts[s]=0;});
+  finalResults.forEach(d=>{SLOTS.forEach(s=>{const v=d.subBatchYield[s];if(typeof v==='number'){slotSums[s]+=v;slotCounts[s]++;}});});
+  const sorted=[...finalResults].sort((a,b)=>a.lotNo.localeCompare(b.lotNo,undefined,{sensitivity:'base'}));
+  SLOTS.forEach(s=>{
+    const avg=slotCounts[s]>0?slotSums[s]/slotCounts[s]:null;
+    const col=slotColor(avg);
+    const cell=document.createElement('div');
+    cell.className='slot-cell'+(avg===null?' slot-empty':'');
+    if(col){cell.style.background=col.bg;cell.style.color=col.fg;}
+    const ttLines=sorted.map(d=>{const v=d.subBatchYield[s];return typeof v==='number'?(v*100).toFixed(1)+'%':'—';}).join(' ');
+    cell.title=`Slot ${s}: ${ttLines}`;
+    cell.innerHTML=`<span class="sid">${s}</span><span class="sval">${avg!==null?(avg*100).toFixed(1)+'%':'—'}</span>`;
+    grid.appendChild(cell);
+  });
+  document.getElementById('slotHeatmapCard').style.display='block';
+  document.getElementById('slotHeatmapCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+
+// ── FAIL HEATMAP XLS PARSER (binary) ─────────────────────────────────────────
+function hmDecodeRK(rkv){let v;if((rkv&0x02)!==0){v=rkv>>2;}else{const buf=new ArrayBuffer(8);const dv=new DataView(buf);dv.setUint32(0,0,true);dv.setUint32(4,rkv&0xfffffffc,true);v=dv.getFloat64(0,true);}if((rkv&0x01)!==0)v/=100;return v;}
+function hmDecodeUtf16(bytes){return new TextDecoder('utf-16le').decode(bytes);}
+function hmDecodeLatin1(bytes){return new TextDecoder('windows-1252').decode(bytes);}
+function hmGetD(row,colIndex,fallback){if(!row.has(colIndex))return fallback;const value=row.get(colIndex);if(typeof value==='number')return value;const text=String(value??'').trim().replace(/[^\d.\-+eE].*$/,'');const parsed=Number(text);return Number.isFinite(parsed)?parsed:fallback;}
+function hmGetS(row,colIndex){return row.has(colIndex)?String(row.get(colIndex)??''):'';}
+function hmFmtD(row,colIndex){if(!row.has(colIndex))return'';const value=row.get(colIndex);const fmtG=(v,d)=>Number.isFinite(v)?Number(v.toPrecision(d)).toString():'';return typeof value==='number'?fmtG(value,6):'';}
+
+function hmExtractWorkbookStream(raw){
+  if(raw.length<512)return null;
+  const view=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
+  const secSize=1<<view.getInt16(30,true);
+  const fatSectors=[];
+  for(let i=0;i<109;i++){const sec=view.getInt32(76+i*4,true);if(sec<0)break;fatSectors.push(sec);}
+  const fat=new Int32Array(fatSectors.length*secSize/4);
+  for(let fi=0;fi<fatSectors.length;fi++){const off=512+fatSectors[fi]*secSize;for(let j=0;j<secSize/4;j++){if(off+j*4+4<=raw.length)fat[fi*secSize/4+j]=view.getInt32(off+j*4,true);}}
+  const dirSec=view.getInt32(48,true);const dirOff=512+dirSec*secSize;let wbStart=-1;
+  for(let e=0;e<32;e++){
+    const entryOff=dirOff+e*128;if(entryOff+128>raw.length)break;
+    const nameLen=view.getInt16(entryOff+64,true);const entType=raw[entryOff+66];if(entType===0)continue;
+    const startSec=view.getInt32(entryOff+116,true);let name='';
+    if(nameLen>0&&nameLen<=64)name=hmDecodeUtf16(raw.slice(entryOff,entryOff+nameLen)).replace(/\0+$/g,'');
+    if(name.toLowerCase()==='workbook'||name.toLowerCase()==='book'){wbStart=startSec;break;}
+  }
+  if(wbStart<0)return null;
+  const chunks=[];let total=0;let cur=wbStart;const visited=new Set();
+  while(cur>=0&&cur<0x7ffffff0){if(visited.has(cur))break;visited.add(cur);const off=512+cur*secSize;if(off+secSize>raw.length)break;const chunk=raw.slice(off,off+secSize);chunks.push(chunk);total+=chunk.length;if(cur>=fat.length)break;cur=fat[cur];}
+  const wbArr=new Uint8Array(total);let p=0;for(const chunk of chunks){wbArr.set(chunk,p);p+=chunk.length;}
+  return wbArr;
+}
+
+function hmFindLoggerDataOffset(wb,sst){
+  const view=new DataView(wb.buffer,wb.byteOffset,wb.byteLength);
+  const sheets=[];let pos=0;
+  while(pos<wb.length-4){
+    const rt=view.getUint16(pos,true);const rl=view.getUint16(pos+2,true);const data=pos+4;const boundary=data+rl;
+    if(rt===0x00fc&&rl>=8){
+      const unique=view.getInt32(data+4,true);let sp=data+8;
+      while(sst.length<unique&&sp+3<=boundary){
+        const cc=view.getUint16(sp,true);const fl=wb[sp+2];sp+=3;let richCount=0;
+        if((fl&0x08)!==0&&sp+2<=boundary){richCount=view.getUint16(sp,true);sp+=2;}
+        if((fl&0x04)!==0&&sp+4<=boundary){const ph=view.getInt32(sp,true);sp+=4+ph;}
+        if((fl&0x01)===0){const end=Math.min(sp+cc,boundary);sst.push(hmDecodeLatin1(wb.slice(sp,end)));sp+=cc;}
+        else{const end=Math.min(sp+cc*2,boundary);sst.push(hmDecodeUtf16(wb.slice(sp,end)));sp+=cc*2;}
+        sp+=richCount*4;
+      }
+    }
+    if(rt===0x0085&&rl>=7){
+      const sheetOffset=view.getInt32(data,true);const nameLen=wb[data+6];const enc=wb[data+7];const nameStart=data+8;
+      const name=enc===0?hmDecodeLatin1(wb.slice(nameStart,Math.min(nameStart+nameLen,boundary))):hmDecodeUtf16(wb.slice(nameStart,Math.min(nameStart+nameLen*2,boundary)));
+      sheets.push({name:name.replace(/\0+$/g,''),offset:sheetOffset});
+    }
+    pos+=4+rl;
+  }
+  const logger=sheets.find(s=>s.name.toLowerCase()==='loggerdata');
+  if(logger)return logger.offset;
+  return sheets.length?sheets[sheets.length-1].offset:-1;
+}
+
+function hmParseSheetRows(wb,startOffset,sst){
+  const view=new DataView(wb.buffer,wb.byteOffset,wb.byteLength);
+  const parsed=new Map();
+  const setCell=(r,c,v)=>{if(!parsed.has(r))parsed.set(r,new Map());parsed.get(r).set(c,v);};
+  let pos=startOffset;let started=false;
+  while(pos<wb.length-4){
+    const rt=view.getUint16(pos,true);const rl=view.getUint16(pos+2,true);const data=pos+4;
+    if(rt===0x0809){if(started)break;started=true;}
+    if(started){
+      if(rt===0x0203&&rl>=14){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const v=view.getFloat64(data+6,true);setCell(r,c,v);}
+      else if(rt===0x00fd&&rl>=10){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const si=view.getInt32(data+6,true);setCell(r,c,si<sst.length?sst[si]:'');}
+      else if(rt===0x027e&&rl>=10){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const rkv=view.getInt32(data+6,true);setCell(r,c,hmDecodeRK(rkv));}
+      else if(rt===0x00bd&&rl>=6){const r=view.getUint16(data,true);const cFirst=view.getUint16(data+2,true);const nCells=Math.floor((rl-6)/6);for(let i=0;i<nCells;i++){const rkOff=data+4+i*6+2;if(rkOff+4<=data+rl)setCell(r,cFirst+i,hmDecodeRK(view.getInt32(rkOff,true)));}}
+      else if(rt===0x000a){break;}
+    }
+    pos+=4+rl;
+  }
+  return parsed;
+}
+
+function hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim){
+  const dVth=Number(vth),dVfsd=Number(vfsd),dBv2=Number(bv2),dBv1=Number(bv1),dDelta=Number(delta),dIpd=Number(ipd),dI1=Number(idss1),dI2=Number(idss2),dI3=Number(idss3);
+  if(![dVth,dVfsd,dBv2,dBv1,dDelta,dIpd,dI1,dI2,dI3].every(Number.isFinite))return 6;
+  if(dIpd<lim.ipdLo||dIpd>lim.ipdHi)return 5;
+  if(dVfsd<lim.vfsdLo||dVfsd>lim.vfsdHi)return 3;
+  if(dVth<lim.vthLo||dVth>lim.vthHi)return 6;
+  if(dBv2<lim.bv2Lo||dBv2>lim.bv2Hi)return 6;
+  if(dBv1<lim.bv1Lo||dBv1>lim.bv1Hi)return 6;
+  if(dDelta<lim.deltaLo||dDelta>lim.deltaHi)return 6;
+  if(dI1>lim.idss||dI2>lim.idss||dI3>lim.idss)return 6;
+  if(dI1<0||dI2<0||dI3<0)return 6;
+  return 1;
+}
+
+function hmConvertXlsArrayBuffer(buffer){
+  const raw=new Uint8Array(buffer);
+  const wb=hmExtractWorkbookStream(raw);
+  if(!wb)throw new Error('無法解析 OLE Compound Document。');
+  const sst=[];
+  const ldOffset=hmFindLoggerDataOffset(wb,sst);
+  if(ldOffset<0)throw new Error('找不到 LoggerData 分頁。');
+  const allRows=hmParseSheetRows(wb,ldOffset,sst);
+  const minRow=allRows.get(3)||new Map();
+  const maxRow=allRows.get(4)||new Map();
+  const lim={vthLo:hmGetD(minRow,4,1.5),vthHi:hmGetD(maxRow,4,6.0),vfsdLo:hmGetD(minRow,7,0.4),vfsdHi:hmGetD(maxRow,7,0.9),bv2Lo:hmGetD(minRow,8,19.65),bv2Hi:hmGetD(maxRow,8,23.0),bv1Lo:hmGetD(minRow,9,19.65),bv1Hi:hmGetD(maxRow,9,22.5),deltaLo:hmGetD(minRow,10,0.02),deltaHi:hmGetD(maxRow,10,2.0),ipdLo:hmGetD(minRow,11,20.0),ipdHi:hmGetD(maxRow,11,40.0),idss:hmGetD(maxRow,12,10.0)};
+  const out=['Serial,Bin,X,Y,X_old,Y_old,VTH,GET VTH <1.5V,GET VTH >6V,VFSD,BVDSS_2,BVDSS_1,Delta3,IPD_10V,IDSS1,IDSS2,IDSS3,BVDSS_bin1,BVDSS_bin2,Wafer_ID'];
+  let globalSerial=0;let converted=0;
+  const rowIndexes=[...allRows.keys()].sort((a,b)=>a-b);
+  for(const rowIdx of rowIndexes){
+    if(rowIdx<10)continue;
+    const row=allRows.get(rowIdx);
+    const remark=hmGetS(row,17);if(!remark.trim())continue;
+    let waferStr=remark.trim();if(waferStr.length>=2)waferStr=waferStr.slice(-2);
+    const waferId=parseInt(waferStr,10);if(!Number.isFinite(waferId))continue;
+    globalSerial++;
+    const xOldObj=row.get(2);const xOld=typeof xOldObj==='number'?Math.trunc(xOldObj):0;if(xOld<=0)continue;
+    const x=Math.trunc((xOld+12)/13);const y=13-((xOld-1)%13);
+    const serialObj=row.get(0);const serial=typeof serialObj==='number'?Math.trunc(serialObj):globalSerial;
+    const vth=hmFmtD(row,4);const gtvLo=hmFmtD(row,5);const gtvHi=hmFmtD(row,6);const vfsd=hmFmtD(row,7);const bv2=hmFmtD(row,8);const bv1=hmFmtD(row,9);const delta=hmFmtD(row,10);const ipd=hmFmtD(row,11);const idss1=hmFmtD(row,12);const idss2=hmFmtD(row,13);const idss3=hmFmtD(row,14);const bvBin1=hmFmtD(row,15);const bvBin2=hmFmtD(row,16);
+    const binObj=row.get(1);const bin=typeof binObj==='number'?Math.trunc(binObj):hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim);
+    out.push([serial,bin,x,y,xOld,0,vth,gtvLo,gtvHi,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,bvBin1,bvBin2,waferId].join(','));converted++;
+  }
+  if(!converted)throw new Error('LoggerData 中沒有可轉換的量測資料。');
+  return out.join('\r\n')+'\r\n';
+}
+
+function hmParseCsv(text){
+  const parsedRows=[];let row=[];let cell='';let inQuotes=false;
+  const src=text.replace(/^\uFEFF/,'');
+  for(let i=0;i<src.length;i++){
+    const ch=src[i];
+    if(inQuotes){if(ch==='"'&&src[i+1]==='"'){cell+='"';i++;}else if(ch==='"')inQuotes=false;else cell+=ch;}
+    else if(ch==='"')inQuotes=true;
+    else if(ch===','){row.push(cell);cell='';}
+    else if(ch==='\n'){row.push(cell.replace(/\r$/,''));parsedRows.push(row);row=[];cell='';}
+    else{cell+=ch;}
+  }
+  if(cell.length||row.length){row.push(cell.replace(/\r$/,''));parsedRows.push(row);}
+  const nonEmpty=parsedRows.filter(r=>r.some(v=>String(v).trim()!==''));
+  if(!nonEmpty.length)throw new Error('CSV 為空。');
+  return{headers:nonEmpty[0].map(h=>h.trim()),rows:nonEmpty.slice(1)};
+}
+
+function autoHmRenderToCanvas(csvText,lotName,paramCsvName){
+  const parsed=hmParseCsv(csvText);
+  const headers=parsed.headers;const rows=parsed.rows;
+  const idxOf=name=>headers.findIndex(h=>h.toLowerCase()===name.toLowerCase());
+  const idxBin=idxOf('Bin'),idxX=idxOf('X'),idxY=idxOf('Y'),idxWafer=idxOf('Wafer_ID'),idxParam=idxOf(paramCsvName);
+  if(idxBin<0||idxX<0||idxY<0||idxWafer<0||idxParam<0)return null;
+  const wafers=new Map();
+  for(const cols of rows){
+    const bin=parseInt(cols[idxBin]||'',10);const x=parseInt(cols[idxX]||'',10);const y=parseInt(cols[idxY]||'',10);const wid=parseInt(cols[idxWafer]||'',10);
+    if(!Number.isFinite(bin)||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(wid))continue;
+    const rawVal=cols[idxParam]||'';const numVal=rawVal.trim()===''?null:Number(rawVal);const hasVal=numVal!==null&&Number.isFinite(numVal);
+    if(!wafers.has(wid))wafers.set(wid,[]);
+    wafers.get(wid).push({Bin:bin,X:x,Y:y,Value:hasVal?numVal:0,HasValue:hasVal});
+  }
+  if(!wafers.size)return null;
+  const limits=FAIL_PARAM_LIMITS[paramCsvName];
+  const loLimit=limits?limits[0]:null;const hiLimit=limits?limits[1]:null;
+  const allDies=[...wafers.values()].flat();
+  const maxX=allDies.length?Math.max(...allDies.map(d=>d.X)):13;
+  const maxY=allDies.length?Math.max(...allDies.map(d=>d.Y)):13;
+  const cellW=28,cellH=18,fontSize=6;
+  const TITLE_H=40,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
+  const waferW=maxX*cellW,waferH=maxY*cellH;
+  const totalW=MARGIN*2+COLS*waferW+(COLS-1)*WAFER_PAD_X;
+  const totalH=MARGIN*2+TITLE_H+GRID_ROWS*(WAFER_LABEL_H+waferH)+(GRID_ROWS-1)*WAFER_PAD_Y;
+  const canvas=document.createElement('canvas');canvas.width=Math.ceil(totalW);canvas.height=Math.ceil(totalH);
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,totalW,totalH);ctx.imageSmoothingEnabled=false;
+  const fmtG=(v,d)=>Number.isFinite(v)?Number(v.toPrecision(d)).toString():'';
+  let limitSuffix='';
+  if(loLimit!=null||hiLimit!=null)limitSuffix=`  [${loLimit==null?'-∞':fmtG(loLimit,4)} ~ ${hiLimit==null?'+∞':fmtG(hiLimit,4)}]`;
+  ctx.fillStyle='#0050c8';ctx.font='700 17px Arial';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(`${lotName} ${paramCsvName} Strip Heatmap${limitSuffix}`,totalW/2,TITLE_H/2);
+  ctx.font='700 11px Arial';ctx.textAlign='left';ctx.textBaseline='top';
+  const BIN_COLORS=new Map([[1,[0,200,0]],[2,[50,180,50]],[3,[200,200,0]],[4,[255,128,0]],[5,[255,0,0]],[6,[180,0,180]]]);
+  for(let gridCol=0;gridCol<COLS;gridCol++){
+    for(let gridRow=0;gridRow<GRID_ROWS;gridRow++){
+      const baseId=gridCol*GRID_ROWS+1;const wid=baseId+(GRID_ROWS-1-gridRow);
+      const ox=MARGIN+gridCol*(waferW+WAFER_PAD_X);let oy=MARGIN+TITLE_H+gridRow*(WAFER_LABEL_H+waferH+WAFER_PAD_Y);
+      ctx.fillStyle='#000';ctx.fillText(`#${wid}`,ox,oy+2);oy+=WAFER_LABEL_H;
+      const list=wafers.get(wid);if(!list)continue;
+      const lookup=new Map(list.map(d=>[`${d.X},${d.Y}`,d]));
+      for(let dy=maxY;dy>=1;dy--){
+        for(let dx=1;dx<=maxX;dx++){
+          const px=ox+(dx-1)*cellW,py=oy+(maxY-dy)*cellH;
+          const die=lookup.get(`${dx},${dy}`);let color=[255,255,255];let oos=false;
+          if(die){oos=die.HasValue&&((loLimit!=null&&die.Value<loLimit)||(hiLimit!=null&&die.Value>hiLimit));color=oos?[210,210,210]:(BIN_COLORS.get(die.Bin)||[160,160,160]);}
+          ctx.fillStyle=`rgb(${color[0]},${color[1]},${color[2]})`;ctx.fillRect(px,py,Math.max(1,cellW-1),Math.max(1,cellH-1));
+          if(die&&die.HasValue){ctx.fillStyle=oos?'#a00000':'#000';ctx.font=`${fontSize}px Arial`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(fmtG(die.Value,4),px+cellW/2,py+cellH/2);}
+        }
+      }
+    }
+  }
+  return canvas;
+}
+
+function canvasToPngBlob(canvas){return new Promise(resolve=>canvas.toBlob(blob=>resolve(blob),'image/png'));}
+
+// ── AUTO FAIL HEATMAP ─────────────────────────────────────────────────────────
+document.getElementById('btnAutoFailHeatmap').onclick=async()=>{
+  const btn=document.getElementById('btnAutoFailHeatmap');
+  btn.disabled=true;
+  const origText=btn.innerHTML;
+  btn.innerHTML='<svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;animation:spin .7s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> 處理中...';
+  showProgress(true);setProgress(5);
+  try{
+    const THRESHOLD=0.01;
+    const failedParams=new Set();
+    for(const d of finalResults){
+      for(const item of JUDGED_ITEMS){
+        const rate=d.input>0?(d.failCounts[item]||0)/d.input:0;
+        if(rate>THRESHOLD)failedParams.add(item);
+      }
+    }
+    if(failedParams.size===0){
+      addLog('✅ 所有參數 fail rate ≤ 1%，無需產生 Heatmap。');
+      return;
+    }
+    addLog(`偵測 fail > 1% 的參數：${[...failedParams].join(', ')}`);
+    const zip=new JSZip();let pngCount=0;let done=0;const total=rptEntries.length;
+    for(const entry of rptEntries){
+      const lotName=entry.name.replace(/^.*[\\\/]/,'').replace(/\.[^.]+$/,'');
+      const result=finalResults.find(r=>(r.lotNo||'')===lotName||(r.fileName||'').replace(/\.[^.]+$/,'')===lotName);
+      if(!result){done++;setProgress(5+Math.round(done/total*85));continue;}
+      const lotFailParams=JUDGED_ITEMS.filter(item=>result.input>0&&(result.failCounts[item]||0)/result.input>THRESHOLD);
+      if(!lotFailParams.length){done++;setProgress(5+Math.round(done/total*85));continue;}
+      let csvText;
+      try{csvText=hmConvertXlsArrayBuffer(entry.data);}
+      catch(err){addLog(`[警告] ${entry.name} 轉換失敗: ${err.message}`,true);done++;continue;}
+      for(const item of lotFailParams){
+        const csvParamName=FAIL_PARAM_CSV_MAP[item];if(!csvParamName)continue;
+        try{
+          const canvas=autoHmRenderToCanvas(csvText,lotName,csvParamName);
+          if(!canvas){addLog(`[警告] ${lotName} ${item} 無法渲染`,true);continue;}
+          const blob=await canvasToPngBlob(canvas);
+          zip.file(`${lotName}_${csvParamName}.png`,blob);pngCount++;
+          addLog(`  ✓ ${lotName} — ${item}`);
+        }catch(err){addLog(`[警告] ${lotName} ${item}: ${err.message}`,true);}
+      }
+      done++;setProgress(5+Math.round(done/total*85));
+    }
+    if(pngCount===0){addLog('無法產生任何 heatmap（需要 .xls 原始格式）',true);return;}
+    setProgress(95);
+    const zipBlob=await zip.generateAsync({type:'blob'});
+    const url=URL.createObjectURL(zipBlob);const a=document.createElement('a');
+    a.href=url;a.download=`FailHeatmap_${todayStr()}.zip`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    setProgress(100);
+    addLog(`✅ 已產生 ${pngCount} 張 heatmap → FailHeatmap_${todayStr()}.zip`);
+  }catch(err){addLog(`Fail Heatmap 失敗: ${err.message}`,true);}
+  finally{
+    btn.disabled=finalResults.length===0;btn.innerHTML=origText;
+    setTimeout(()=>showProgress(false),700);
+  }
+};
+
+// ── SPIN KEYFRAME (for loading spinner) ───────────────────────────────────────
+const styleEl=document.createElement('style');
+styleEl.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(styleEl);
+</script>
+</body>
+</html>
