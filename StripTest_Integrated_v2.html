@@ -319,6 +319,77 @@ body {
 </head>
 <body>
 
+<!-- ══ LOGIN OVERLAY ══ -->
+<div id="loginOverlay" style="
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#1a1f2e 0%,#2d3548 100%);
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:#fff;border-radius:16px;padding:48px 40px;
+    width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.4);
+    text-align:center;
+  ">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1167a8" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"
+      style="width:48px;height:48px;margin-bottom:12px;">
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    <div style="font-size:20px;font-weight:700;color:#202428;margin-bottom:4px;">Strip Test Suite</div>
+    <div style="font-size:13px;color:#888;margin-bottom:28px;">請輸入密碼以繼續</div>
+    <input id="loginInput" type="password" placeholder="輸入密碼" style="
+      width:100%;box-sizing:border-box;padding:11px 14px;
+      border:1.5px solid #d0d5dd;border-radius:8px;
+      font-size:15px;outline:none;transition:border .2s;
+      margin-bottom:12px;
+    "
+    onkeydown="if(event.key==='Enter')doLogin()"
+    onfocus="this.style.borderColor='#1167a8'"
+    onblur="this.style.borderColor='#d0d5dd'"
+    >
+    <div id="loginError" style="
+      color:#c0392b;font-size:13px;min-height:20px;margin-bottom:8px;
+    "></div>
+    <button onclick="doLogin()" style="
+      width:100%;padding:11px;background:#1167a8;color:#fff;
+      border:none;border-radius:8px;font-size:15px;font-weight:600;
+      cursor:pointer;transition:background .2s;
+    "
+    onmouseover="this.style.background='#0d5490'"
+    onmouseout="this.style.background='#1167a8'"
+    >登入</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PASS="stp2026";
+  const KEY="stp_auth";
+  // Already logged in this session?
+  if(sessionStorage.getItem(KEY)===PASS){
+    document.getElementById("loginOverlay").style.display="none";
+  }
+  window.doLogin=function(){
+    const val=document.getElementById("loginInput").value;
+    if(val===PASS){
+      sessionStorage.setItem(KEY,PASS);
+      const ov=document.getElementById("loginOverlay");
+      ov.style.transition="opacity .4s";
+      ov.style.opacity="0";
+      setTimeout(()=>ov.style.display="none",400);
+    }else{
+      const err=document.getElementById("loginError");
+      err.textContent="密碼錯誤，請再試一次。";
+      const inp=document.getElementById("loginInput");
+      inp.style.borderColor="#c0392b";
+      inp.value="";inp.focus();
+      setTimeout(()=>{err.textContent="";inp.style.borderColor="#d0d5dd";},2500);
+    }
+  };
+})();
+</script>
+
 <!-- ══ NAV BAR ══ -->
 <nav class="nav-bar">
   <div class="nav-logo">
