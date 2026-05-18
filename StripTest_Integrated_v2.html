@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strip Test Suite</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+/* ══════════════════════════════════════════════════
+   GLOBAL / NAV
+══════════════════════════════════════════════════ */
+:root {
+  --bg: #12141c;
+  --panel: #1a1e2a;
+  --accent: #4682d2;
+  --text: #d7dceb;
+  --ok: #3cbe82;
+  --border: #37415a;
+  --warn: #e8a020;
+  --nav-h: 52px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── Tab Nav ── */
+.nav-bar {
+  position: sticky; top: 0; z-index: 900;
+  display: flex; align-items: stretch;
+  height: var(--nav-h);
+  background: #0e1018;
+  border-bottom: 2px solid var(--border);
+  user-select: none;
+}
+.nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px;
+  font-weight: 800; font-size: 15px;
+  color: var(--accent);
+  letter-spacing: .5px;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+.nav-logo svg { width: 22px; height: 22px; }
+.nav-tabs { display: flex; }
+.nav-tab {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 22px;
+  font-size: 13.5px; font-weight: 600;
+  color: #6a7898;
+  cursor: pointer;
+  border: none; background: none;
+  border-bottom: 3px solid transparent;
+  transition: color .18s, border-color .18s, background .18s;
+  position: relative; top: 2px;
+}
+.nav-tab:hover { color: var(--text); background: rgba(70,130,210,.06); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-tab .tab-num {
+  font-size: 10px; font-weight: 800;
+  background: var(--border);
+  color: var(--text);
+  border-radius: 20px;
+  padding: 1px 7px;
+  letter-spacing: .3px;
+}
+.nav-tab.active .tab-num { background: var(--accent); color: #fff; }
+
+/* ── Pages ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ══════════════════════════════════════════════════
+   PAGE 1 — STRIP TEST REPORT GENERATOR
+══════════════════════════════════════════════════ */
+#page-report {
+  padding: 24px 20px;
+}
+#page-report .container { max-width: 1100px; margin: 0 auto; }
+#page-report h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: .5px; }
+#page-report .subtitle { margin-bottom: 14px; color: var(--accent); font-weight: bold; font-size: 13px; }
+
+.drop-zone-r {
+  border: 3px dashed var(--border);
+  background: var(--panel);
+  padding: 36px;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.drop-zone-r.active { border-color: var(--accent); background: #23293a; }
+.drop-zone-r svg { width: 40px; height: 40px; margin-bottom: 10px; color: var(--accent); }
+
+.controls { margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap; }
+.btn {
+  background: var(--accent); color: white; border: none;
+  padding: 11px 22px; border-radius: 6px; cursor: pointer;
+  font-weight: bold; display: flex; align-items: center; gap: 8px;
+  font-size: 14px; transition: opacity .2s;
+}
+.btn:disabled { background: #444; opacity: 0.45; cursor: not-allowed; }
+.btn.green { background: var(--ok); }
+.log-area {
+  background: #000; color: #adffad; padding: 14px; border-radius: 6px;
+  height: 220px; overflow-y: auto; font-family: 'Consolas', monospace;
+  font-size: 12px; border: 1px solid var(--border);
+}
+
+/* Heatmap modal (page 1) */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000; overflow: auto; padding: 20px; }
+.modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+.modal-box {
+  background: #1a1e2a; border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; min-width: 860px; max-width: 1200px; width: 100%; position: relative;
+}
+.modal-box h3 { margin: 0 0 16px; color: var(--accent); font-size: 16px; }
+.modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--text); cursor: pointer; font-size: 22px; line-height: 1; opacity: .7; }
+.modal-close:hover { opacity: 1; }
+.heatmap-wrap { overflow-x: auto; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; min-width: 780px; }
+.heatmap-cell { border-radius: 4px; padding: 5px 3px; text-align: center; font-size: 10px; line-height: 1.3; cursor: default; transition: transform .1s; }
+.heatmap-cell:hover { transform: scale(1.06); z-index: 2; position: relative; }
+.heatmap-cell .slot-id { font-weight: 700; font-size: 11px; display: block; }
+.heatmap-cell .slot-val { display: block; }
+.heatmap-empty { background: #2a2f3f; color: #555; }
+.heatmap-legend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12px; }
+.legend-bar { height: 14px; width: 220px; border-radius: 3px; background: linear-gradient(to right, #c0392b, #e67e22, #f1c40f, #2ecc71, #27ae60); }
+.legend-label { color: #aaa; }
+
+/* ══════════════════════════════════════════════════
+   PAGE 2 — STRIP HEATMAP (light theme)
+══════════════════════════════════════════════════ */
+#page-heatmap {
+  background: #f4f5f7;
+  color: #202428;
+  min-height: calc(100vh - var(--nav-h));
+  font-size: 14px;
+}
+#page-heatmap * { box-sizing: border-box; }
+#page-heatmap [hidden] { display: none !important; }
+
+#page-heatmap header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 18px;
+  border-bottom: 1px solid #d5d9df; background: #fff;
+}
+#page-heatmap h1 { margin: 0; font-size: 18px; font-weight: 650; color: #202428; }
+#hm-topStatus { min-height: 20px; color: #66707a; line-height: 1.45; }
+
+#page-heatmap main {
+  display: grid;
+  grid-template-columns: 360px minmax(0,1fr);
+  min-height: calc(100vh - var(--nav-h) - 57px);
+}
+#page-heatmap aside {
+  padding: 14px; border-right: 1px solid #d5d9df;
+  background: #fbfbfc; overflow: auto;
+}
+#page-heatmap .stage { min-width: 0; padding: 14px; overflow: auto; }
+
+#page-heatmap .group {
+  margin-bottom: 12px; padding: 12px;
+  border: 1px solid #d2d7dd; border-radius: 8px; background: #fff;
+}
+#page-heatmap .group h2 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #313840; }
+#page-heatmap label { display: block; margin: 9px 0 5px; color: #66707a; font-size: 12px; }
+#page-heatmap input[type="text"],
+#page-heatmap input[type="number"],
+#page-heatmap select {
+  width: 100%; height: 34px; padding: 6px 8px;
+  border: 1px solid #b8c0c8; border-radius: 6px;
+  background: #fff; color: #202428; font: inherit;
+}
+#page-heatmap input[type="file"] { width: 100%; font-size: 13px; }
+#page-heatmap .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#page-heatmap .check-row { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: end; }
+#page-heatmap .check-row label { display: flex; gap: 6px; align-items: center; margin: 0 0 7px; color: #2d343b; font-size: 13px; }
+#page-heatmap .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+#page-heatmap button {
+  height: 34px; padding: 0 12px; border: 1px solid #aeb7c0;
+  border-radius: 6px; background: #fff; color: #202428; font: inherit; cursor: pointer;
+}
+#page-heatmap button.primary { border-color: #1167a8; background: #1167a8; color: #fff; }
+#page-heatmap button.good { border-color: #157349; background: #157349; color: #fff; }
+#page-heatmap button:disabled { opacity: .5; cursor: default; }
+#page-heatmap .status { min-height: 20px; color: #66707a; line-height: 1.45; }
+#page-heatmap .error { color: #a13b2f; }
+#page-heatmap .legend { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px 10px; }
+#page-heatmap .swatch { display: flex; align-items: center; gap: 6px; min-width: 0; color: #35404a; font-size: 12px; }
+#page-heatmap .swatch i { display: inline-block; width: 16px; height: 14px; border: 1px solid #b8c0c8; flex: 0 0 auto; }
+.canvas-shell { display: inline-block; min-width: 620px; min-height: 380px; padding: 12px; border: 1px solid #d2d7dd; border-radius: 8px; background: #eef1f3; }
+#hm-canvas { display: block; background: #fff; }
+.hm-empty { display: grid; place-items: center; min-height: 320px; color: #66707a; border: 1px dashed #b8c0c8; border-radius: 8px; background: #fff; }
+#page-heatmap .report { margin-top: 12px; border: 1px solid #d2d7dd; border-radius: 8px; background: #fff; overflow: hidden; }
+#page-heatmap .report-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #d2d7dd; background: #fafbfc; }
+#page-heatmap .report-head h2 { margin: 0; font-size: 13px; }
+#page-heatmap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#page-heatmap th, #page-heatmap td { padding: 7px 9px; border-bottom: 1px solid #edf0f2; text-align: right; white-space: nowrap; }
+#page-heatmap th:first-child, #page-heatmap td:first-child { text-align: left; }
+#page-heatmap th { color: #4d5963; background: #fff; }
+#page-heatmap .yield-good { color: #147443; font-weight: 700; }
+#page-heatmap .yield-warn { color: #926c00; font-weight: 700; }
+#page-heatmap .yield-bad  { color: #a13b2f; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════
+   PAGE 3 — STRIP TEST MERGER (light theme)
+══════════════════════════════════════════════════ */
+#page-merger {
+  background: #F5F7FA;
+  color: #1A2340;
+  min-height: calc(100vh - var(--nav-h));
+  padding: 32px 16px 64px;
+  font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+}
+#page-merger * { box-sizing: border-box; }
+
+.merger-app { max-width: 820px; margin: 0 auto; }
+
+.merger-header {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 36px;
+}
+.merger-logo {
+  width: 46px; height: 46px; background: #4472C4; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.merger-logo svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.merger-h1 { font-size: 22px; font-weight: 700; color: #2F528F; letter-spacing: -0.3px; }
+.merger-h1 span { color: #ED7D31; }
+.merger-subtitle { font-size: 13px; color: #6B7799; margin-top: 2px; }
+
+.card {
+  background: #fff; border: 1px solid #D9E1EF;
+  border-radius: 10px; box-shadow: 0 2px 12px rgba(68,114,196,.10);
+  padding: 24px 28px; margin-bottom: 20px;
+}
+.card-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; color: #4472C4; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-title .tag {
+  font-size: 10px; background: #DCE6F1; color: #2F528F;
+  padding: 2px 8px; border-radius: 20px; font-weight: 600;
+  letter-spacing: 0; text-transform: none;
+}
+.card-title .tag.optional { background: #FFF2E8; color: #B85A00; }
+
+.drop-zone-m {
+  border: 2px dashed #D9E1EF; border-radius: 8px; padding: 28px 20px;
+  text-align: center; cursor: pointer; transition: all .18s;
+  position: relative; background: #F5F7FA;
+}
+.drop-zone-m:hover, .drop-zone-m.drag-over { border-color: #4472C4; background: #DCE6F1; }
+.drop-zone-m input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-icon { width: 36px; height: 36px; background: #DCE6F1; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.drop-icon svg { width: 18px; height: 18px; stroke: #4472C4; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drop-label { font-size: 14px; font-weight: 600; color: #1A2340; margin-bottom: 4px; }
+.drop-hint { font-size: 12px; color: #6B7799; }
+
+.file-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.file-item { display: flex; align-items: center; gap: 10px; background: #F5F7FA; border: 1px solid #D9E1EF; border-radius: 7px; padding: 9px 14px; font-size: 13px; animation: slideIn .18s ease; }
+@keyframes slideIn { from { opacity:0; transform:translateY(-6px);} to {opacity:1;transform:translateY(0);} }
+.file-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.file-icon.xlsx, .file-icon.xls { background: #E8F5E0; color: #375623; }
+.file-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-size { font-size: 11px; color: #6B7799; flex-shrink: 0; }
+.file-status { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; flex-shrink: 0; }
+.file-status.ok      { background: #E8F5E0; color: #375623; }
+.file-status.err     { background: #FCEAEA; color: #C00000; }
+.file-status.reading { background: #EDF2FF; color: #4472C4; }
+.remove-btn { background: none; border: none; cursor: pointer; color: #6B7799; padding: 2px; border-radius: 4px; display: flex; align-items: center; transition: color .15s; flex-shrink: 0; }
+.remove-btn:hover { color: #C00000; }
+.remove-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 16px; }
+.stat-box { background: #F5F7FA; border: 1px solid #D9E1EF; border-radius: 8px; padding: 14px 16px; text-align: center; }
+.stat-num { font-size: 28px; font-weight: 800; color: #2F528F; line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 11px; color: #6B7799; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.merge-btn { width: 100%; padding: 16px; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: .3px; }
+.merge-btn:disabled { background: #D9E1EF; color: #6B7799; cursor: not-allowed; }
+.merge-btn:not(:disabled) { background: #4472C4; color: #fff; box-shadow: 0 4px 16px rgba(68,114,196,.35); }
+.merge-btn:not(:disabled):hover { background: #2F528F; transform: translateY(-1px); }
+.merge-btn:not(:disabled):active { transform: translateY(0); }
+.merge-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.log-box { background: #1A2340; color: #A8C4E8; border-radius: 8px; padding: 16px 18px; font-family: 'Consolas','Courier New',monospace; font-size: 12px; line-height: 1.8; max-height: 200px; overflow-y: auto; margin-top: 16px; display: none; }
+.log-box.active { display: block; }
+.log-line { margin: 0; }
+.log-line.ok   { color: #7ED87E; }
+.log-line.warn { color: #FFD166; }
+.log-line.err  { color: #FF7B7B; }
+.log-line.info { color: #A8C4E8; }
+.success-banner { background: linear-gradient(135deg,#375623 0%,#4A7A30 100%); color: #fff; border-radius: 10px; padding: 20px 24px; display: none; align-items: center; gap: 16px; margin-top: 16px; animation: popIn .3s cubic-bezier(.34,1.56,.64,1); }
+@keyframes popIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.success-banner.active { display: flex; }
+.success-icon { font-size: 32px; flex-shrink: 0; }
+.success-text h3 { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.success-text p  { font-size: 13px; opacity: .85; }
+.progress-bar-wrap { height: 4px; background: #DCE6F1; border-radius: 4px; overflow: hidden; margin: 10px 0 0; display: none; }
+.progress-bar-wrap.active { display: block; }
+.progress-bar { height: 100%; background: #4472C4; border-radius: 4px; width: 0%; transition: width .3s ease; }
+.col-map-note { font-size: 12px; color: #6B7799; background: #FFFBF0; border: 1px solid #FFE8B0; border-radius: 7px; padding: 10px 14px; margin-top: 14px; line-height: 1.6; }
+.col-map-note strong { color: #B85A00; }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 920px) {
+  #page-heatmap main { grid-template-columns: 1fr; }
+  #page-heatmap aside { border-right: 0; border-bottom: 1px solid #d5d9df; }
+  .canvas-shell { min-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN OVERLAY ══ -->
+<div id="loginOverlay" style="
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#1a1f2e 0%,#2d3548 100%);
+  display:flex;align-items:center;justify-content:center;
+">
+  <div style="
+    background:#fff;border-radius:16px;padding:48px 40px;
+    width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.4);
+    text-align:center;
+  ">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#1167a8" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"
+      style="width:48px;height:48px;margin-bottom:12px;">
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+    <div style="font-size:20px;font-weight:700;color:#202428;margin-bottom:4px;">Strip Test Suite</div>
+    <div style="font-size:13px;color:#888;margin-bottom:28px;">請輸入密碼以繼續</div>
+    <input id="loginInput" type="password" placeholder="輸入密碼" style="
+      width:100%;box-sizing:border-box;padding:11px 14px;
+      border:1.5px solid #d0d5dd;border-radius:8px;
+      font-size:15px;outline:none;transition:border .2s;
+      margin-bottom:12px;
+    "
+    onkeydown="if(event.key==='Enter')doLogin()"
+    onfocus="this.style.borderColor='#1167a8'"
+    onblur="this.style.borderColor='#d0d5dd'"
+    >
+    <div id="loginError" style="
+      color:#c0392b;font-size:13px;min-height:20px;margin-bottom:8px;
+    "></div>
+    <button onclick="doLogin()" style="
+      width:100%;padding:11px;background:#1167a8;color:#fff;
+      border:none;border-radius:8px;font-size:15px;font-weight:600;
+      cursor:pointer;transition:background .2s;
+    "
+    onmouseover="this.style.background='#0d5490'"
+    onmouseout="this.style.background='#1167a8'"
+    >登入</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const PASS="stp2026";
+  const KEY="stp_auth";
+  // Already logged in this session?
+  if(sessionStorage.getItem(KEY)===PASS){
+    document.getElementById("loginOverlay").style.display="none";
+  }
+  window.doLogin=function(){
+    const val=document.getElementById("loginInput").value;
+    if(val===PASS){
+      sessionStorage.setItem(KEY,PASS);
+      const ov=document.getElementById("loginOverlay");
+      ov.style.transition="opacity .4s";
+      ov.style.opacity="0";
+      setTimeout(()=>ov.style.display="none",400);
+    }else{
+      const err=document.getElementById("loginError");
+      err.textContent="密碼錯誤，請再試一次。";
+      const inp=document.getElementById("loginInput");
+      inp.style.borderColor="#c0392b";
+      inp.value="";inp.focus();
+      setTimeout(()=>{err.textContent="";inp.style.borderColor="#d0d5dd";},2500);
+    }
+  };
+})();
+</script>
+
+<!-- ══ NAV BAR ══ -->
+<nav class="nav-bar">
+  <div class="nav-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/>
+      <path d="M3 9h18M9 21V9"/>
+    </svg>
+    Strip Test Suite
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-page="page-report">
+      <span class="tab-num">1</span> Report Generator
+    </button>
+    <button class="nav-tab" data-page="page-heatmap">
+      <span class="tab-num">2</span> Strip Heatmap
+    </button>
+    <button class="nav-tab" data-page="page-merger">
+      <span class="tab-num">3</span> Report Merger
+    </button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════
+     PAGE 1 — STRIP TEST REPORT GENERATOR
+══════════════════════════════════════════════ -->
+<div id="page-report" class="page active">
+<div class="container">
+  <h2>Strip Test Report Generator</h2>
+  <div class="subtitle">[模式：LoggerData 專用 | 分母：169]</div>
+
+  <div class="drop-zone-r" id="dropZone">
+    <i data-lucide="file-spreadsheet"></i>
+    <p id="dropText">拖曳 Log xls/xlsx/zip 至此或點擊選取</p>
+    <input type="file" id="fileInput" multiple accept=".xls,.xlsx,.zip" style="display:none">
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="btnProcess" disabled><i data-lucide="play"></i> 解析數據</button>
+    <button class="btn green" id="btnExport" disabled><i data-lucide="download"></i> 導出匯總表</button>
+    <button class="btn" id="btnHeatmap" disabled style="background:#7c5cbf"><i data-lucide="grid-3x3"></i> Slot Heatmap</button>
+    <button class="btn" id="btnAutoFailHeatmap" disabled style="background:#b5451b"><i data-lucide="flame"></i> 下載 Fail Heatmap</button>
+  </div>
+
+  <div class="log-area" id="logArea">準備就緒...</div>
+</div>
+
+<!-- Heatmap Modal -->
+<div class="modal-overlay" id="heatmapModal">
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h3 id="heatmapTitle">Slot Yield Heatmap</h3>
+    <div class="heatmap-wrap">
+      <div class="heatmap-grid" id="heatmapGrid"></div>
+    </div>
+    <div class="heatmap-legend">
+      <span class="legend-label">低</span>
+      <div class="legend-bar"></div>
+      <span class="legend-label">高 (100%)</span>
+      <span style="margin-left:16px;color:#aaa;font-size:11px;">紅 &lt;80% ｜ 橙 80-90% ｜ 黃 90-95% ｜ 綠 ≥95%</span>
+    </div>
+  </div>
+</div>
+</div><!-- /page-report -->
+
+
+<!-- ══════════════════════════════════════════════
+     PAGE 2 — STRIP HEATMAP
+══════════════════════════════════════════════ -->
+<div id="page-heatmap" class="page">
+  <header>
+    <h1>Strip Heatmap</h1>
+    <div class="status" id="hm-topStatus">請選擇 CSV 檔案。</div>
+  </header>
+  <main>
+    <aside>
+      <section class="group">
+        <h2>XLS 轉 CSV</h2>
+        <input id="hm-xlsFile" type="file" accept=".xls,application/vnd.ms-excel">
+        <div class="buttons">
+          <button id="hm-convertXlsBtn">轉換並下載 CSV</button>
+        </div>
+        <div class="status" id="hm-xlsStatus">支援含 LoggerData 分頁的 BIFF8 .xls（含 BVDSS bin1/bin2 新欄位）。</div>
+      </section>
+
+      <section class="group">
+        <h2>CSV</h2>
+        <input id="hm-csvFile" type="file" accept=".csv,text/csv">
+        <div class="status" id="hm-fileStatus">需要欄位：Bin, X, Y, Wafer_ID。BVDSS_bin1/bin2 可畫 heatmap，不計入良率。</div>
+      </section>
+
+      <section class="group">
+        <h2>Heatmap</h2>
+        <label for="hm-param">參數</label>
+        <select id="hm-param"></select>
+        <div class="row">
+          <div class="check-row">
+            <label><input id="hm-useLo" type="checkbox">下限</label>
+            <input id="hm-lo" type="number" step="any" value="1.5">
+          </div>
+          <div class="check-row">
+            <label><input id="hm-useHi" type="checkbox">上限</label>
+            <input id="hm-hi" type="number" step="any" value="6">
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="hm-cellW">Cell W</label>
+            <input id="hm-cellW" type="number" min="4" max="80" step="1" value="28">
+          </div>
+          <div>
+            <label for="hm-cellH">Cell H</label>
+            <input id="hm-cellH" type="number" min="4" max="60" step="1" value="18">
+          </div>
+        </div>
+        <label for="hm-fontSize">字型 pt</label>
+        <input id="hm-fontSize" type="number" min="4" max="20" step="1" value="6">
+        <div class="buttons">
+          <button class="primary" id="hm-renderBtn" disabled>Render</button>
+          <button id="hm-downloadPngBtn" disabled>Export PNG</button>
+          <button class="good" id="hm-yieldBtn" disabled>良率報表</button>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>圖例</h2>
+        <div class="legend">
+          <span class="swatch"><i style="background:rgb(0,200,0)"></i>Bin1 Pass</span>
+          <span class="swatch"><i style="background:rgb(200,200,0)"></i>Bin3 Warn</span>
+          <span class="swatch"><i style="background:rgb(255,128,0)"></i>Bin4 Warn2</span>
+          <span class="swatch"><i style="background:rgb(255,0,0)"></i>Bin5 Fail</span>
+          <span class="swatch"><i style="background:rgb(180,0,180)"></i>Bin6 Fail2</span>
+          <span class="swatch"><i style="background:rgb(210,210,210)"></i>Out of spec</span>
+          <span class="swatch"><i style="background:white"></i>No data</span>
+        </div>
+      </section>
+    </aside>
+
+    <section class="stage">
+      <div id="hm-empty" class="hm-empty">載入 CSV 後按 Render 產生 strip heatmap。</div>
+      <div id="hm-canvasShell" class="canvas-shell" hidden>
+        <canvas id="hm-canvas"></canvas>
+      </div>
+      <div id="hm-report" class="report" hidden>
+        <div class="report-head">
+          <h2 id="hm-reportTitle">良率報表</h2>
+          <button id="hm-downloadYieldBtn">匯出 CSV</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Wafer_ID</th><th>Measured Dies</th><th>Pass</th><th>Fail</th><th>Yield (%)</th>
+            </tr>
+          </thead>
+          <tbody id="hm-yieldRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div><!-- /page-heatmap -->
+
+
+<!-- ══════════════════════════════════════════════
+     PAGE 3 — STRIP TEST MERGER
+══════════════════════════════════════════════ -->
+<div id="page-merger" class="page">
+<div class="merger-app">
+  <div class="merger-header">
+    <div class="merger-logo">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    </div>
+    <div>
+      <div class="merger-h1">Strip Test <span>Report Merger</span></div>
+      <div class="merger-subtitle">合併新版與舊版 Strip Test 報表，輸出統一格式 xlsx（新資料優先，依時間新到舊排序）</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4472C4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      每日報表（新格式 / 舊格式均可）
+      <span class="tag">必填 · 支援多檔</span>
+    </div>
+    <div class="drop-zone-m" id="m-newDrop"
+         ondragover="mHandleDragOver(event,'m-newDrop')"
+         ondragleave="mHandleDragLeave(event,'m-newDrop')"
+         ondrop="mHandleDrop(event,'new')">
+      <input type="file" id="m-newInput" multiple accept=".xlsx,.xls" onchange="mHandleFiles(event,'new')">
+      <div class="drop-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="drop-label">拖放或點擊上傳每日報表</div>
+      <div class="drop-hint">支援新格式（52欄）及舊格式（27欄）的 .xlsx / .xls，可同時選取多個日期檔案</div>
+    </div>
+    <div class="file-list" id="m-newFileList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ED7D31" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+      歷史彙整報表
+      <span class="tag optional">選填 · 單檔</span>
+    </div>
+    <div class="drop-zone-m" id="m-oldDrop"
+         ondragover="mHandleDragOver(event,'m-oldDrop')"
+         ondragleave="mHandleDragLeave(event,'m-oldDrop')"
+         ondrop="mHandleDrop(event,'old')">
+      <input type="file" id="m-oldInput" accept=".xlsx,.xls" onchange="mHandleFiles(event,'old')">
+      <div class="drop-icon" style="background:#FFF2E8">
+        <svg viewBox="0 0 24 24" style="stroke:#ED7D31"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+      </div>
+      <div class="drop-label">拖放或點擊上傳歷史彙整報表</div>
+      <div class="drop-hint">上傳前一次已輸出的 StripTest_Summary_*.xlsx</div>
+    </div>
+    <div class="file-list" id="m-oldFileList"></div>
+    <div class="col-map-note">
+      <strong>ℹ 合併原則：</strong>
+      若新資料與歷史報表有相同 Lot No.，<strong>以新資料為主</strong>（刪除歷史中重複批號）。<br>
+      輸出依 <em>Test Date/Time</em> 由新到舊排序；舊格式無 Test Date/Time 者以 <em>Report Date</em> 排序。
+    </div>
+  </div>
+
+  <div class="card" id="m-statsCard" style="display:none">
+    <div class="card-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4472C4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      資料預覽
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="m-statNew">0</div><div class="stat-label">每日報表筆數</div></div>
+      <div class="stat-box"><div class="stat-num" id="m-statOld">0</div><div class="stat-label">歷史報表筆數</div></div>
+      <div class="stat-box"><div class="stat-num" id="m-statDup" style="color:#ED7D31">0</div><div class="stat-label">重複 Lot No. 筆數</div></div>
+    </div>
+    <div class="stats-row" style="margin-top:12px">
+      <div class="stat-box" style="background:#4472C4;border-color:#4472C4;grid-column:1/-1">
+        <div class="stat-num" style="color:#fff" id="m-statTotal">0</div>
+        <div class="stat-label" style="color:rgba(255,255,255,.75)">預計輸出筆數（去重後）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="m-dedupCard" style="display:none">
+    <div class="card-title">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ED7D31" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+      重複 Lot No. 過濾結果
+      <span class="tag optional" id="m-dedupCount">尚無重複</span>
+    </div>
+    <div id="m-dedupTable" style="overflow-x:auto;max-height:260px;overflow-y:auto;border-radius:7px;border:1px solid #D9E1EF">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:420px">
+        <thead>
+          <tr style="background:#4472C4;color:#fff;position:sticky;top:0;z-index:1">
+            <th style="padding:8px 12px;text-align:left;font-weight:700;white-space:nowrap">Lot No.</th>
+            <th style="padding:8px 12px;text-align:center;font-weight:700">歷史筆數</th>
+            <th style="padding:8px 12px;text-align:center;font-weight:700">新增筆數</th>
+            <th style="padding:8px 12px;text-align:left;font-weight:700">處理方式</th>
+          </tr>
+        </thead>
+        <tbody id="m-dedupTbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:#6B7799;display:flex;align-items:center;gap:6px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ED7D31" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      每日報表（新）中出現的 Lot No. 將取代歷史報表中的同批資料，以確保資料最新。
+    </div>
+  </div>
+
+  <button class="merge-btn" id="m-mergeBtn" disabled onclick="doMerge()">
+    <div class="spinner" id="m-spinner"></div>
+    <svg id="m-btnIcon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    <span id="m-btnText">Output — 產出 StripTest_Summary_yyyymmdd.xlsx</span>
+  </button>
+
+  <div class="progress-bar-wrap" id="m-progressWrap">
+    <div class="progress-bar" id="m-progressBar"></div>
+  </div>
+  <div class="log-box" id="m-logBox"></div>
+  <div class="success-banner" id="m-successBanner">
+    <div class="success-icon">✅</div>
+    <div class="success-text">
+      <h3 id="m-successTitle">檔案已下載</h3>
+      <p id="m-successDesc"></p>
+    </div>
+  </div>
+</div>
+</div><!-- /page-merger -->
+
+
+<!-- ══════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════ -->
+<script>
+lucide.createIcons();
+
+// ─── TAB NAVIGATION ──────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.page).classList.add('active');
+  });
+});
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE 1 — STRIP TEST REPORT GENERATOR
+// ══════════════════════════════════════════════════════════════════════════════
+const TARGET_SHEET = "LoggerData";
+const UNITS_PER_SLOT = 169;
+const ROW_MIN=3, ROW_MAX=4, ROW_HEADER=9, ROW_DATA=10;
+const JUDGED_ITEMS=["VTH","VFSD","BVDSS 2","BVDSS 1","Delta3","IPD-10V","IDSS1","IDSS2","IDSS3"];
+const SLOTS=Array.from({length:24},(_,i)=>(i+1).toString().padStart(2,'0'));
+let finalResults=[], rptFiles=[], rptEntries=[];  // rptEntries: unpacked {name,data} list
+
+['dragenter','dragover','dragleave','drop'].forEach(e=>window.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();}));
+const dropZone=document.getElementById('dropZone');
+const fileInput=document.getElementById('fileInput');
+dropZone.onclick=()=>fileInput.click();
+dropZone.onmouseover=()=>dropZone.classList.add('active');
+dropZone.onmouseleave=()=>dropZone.classList.remove('active');
+const onFiles=(f)=>{
+  rptFiles=Array.from(f);
+  if(rptFiles.length){
+    document.getElementById('dropText').innerText=`已選取 ${rptFiles.length} 個檔案`;
+    document.getElementById('btnProcess').disabled=false;
+  }
+};
+fileInput.onchange=e=>onFiles(e.target.files);
+dropZone.ondrop=e=>onFiles(e.dataTransfer.files);
+
+function addLog(msg,isError=false){
+  const d=document.createElement('div');
+  if(isError)d.style.color="#ff6b6b";
+  d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  const area=document.getElementById('logArea');
+  area.appendChild(d);area.scrollTop=area.scrollHeight;
+}
+function isExcelFile(n){return/\.(xls|xlsx)$/i.test(n);}
+function isZipFile(n){return/\.zip$/i.test(n);}
+function baseName(n){return n.replace(/^.*[\\\/]/,'').replace(/\.(xls|xlsx)$/i,'');}
+function getSheetName(wb,target){return wb.SheetNames.find(s=>s.trim().toLowerCase()===target.toLowerCase())||null;}
+function parseLimit(raw){if(raw===null||raw===undefined)return null;const m=String(raw).trim().match(/[-+]?\d*\.?\d+/);return m?Number(m[0]):null;}
+function toNumber(raw){if(raw===null||raw===undefined||raw==="")return null;if(typeof raw==="number")return Number.isFinite(raw)?raw:null;const n=Number(String(raw).trim().replace(/,/g,""));return Number.isFinite(n)?n:null;}
+function extractSubBatch(remark){if(remark===null||remark===undefined)return null;const parts=String(remark).trim().split(/\s+/).filter(Boolean);if(parts.length<2)return null;const code=parts[parts.length-1];return code.length>=2?code.slice(-2):null;}
+function formatFileTime(file){if(!file.lastModified)return "";const d=new Date(file.lastModified);const pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}${pad(d.getSeconds())}`;}
+function todayStr(){const d=new Date();const pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;}
+
+async function collectExcelEntries(inputFiles){
+  const entries=[];
+  for(const file of inputFiles){
+    if(isExcelFile(file.name)){entries.push({name:file.name,data:await file.arrayBuffer(),lastModified:file.lastModified});continue;}
+    if(isZipFile(file.name)){
+      if(typeof JSZip==="undefined")throw new Error("JSZip not loaded.");
+      const zip=await JSZip.loadAsync(await file.arrayBuffer());
+      const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir&&isExcelFile(n));
+      if(!names.length)addLog(`跳過 [${file.name}]: zip 內沒有 xls/xlsx`,true);
+      for(const n of names){entries.push({name:n,data:await zip.files[n].async("arraybuffer"),lastModified:zip.files[n].date?zip.files[n].date.getTime():file.lastModified});}
+      continue;
+    }
+    addLog(`跳過 [${file.name}]: 不支援的檔案類型`,true);
+  }
+  return entries;
+}
+
+function parseWorkbook(entry){
+  const wb=XLSX.read(entry.data,{type:'array',cellDates:false});
+  const sheetName=getSheetName(wb,TARGET_SHEET);
+  if(!sheetName)throw new Error(`Sheet '${TARGET_SHEET}' not found.`);
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:""});
+  if(rows.length<=ROW_HEADER)throw new Error("Insufficient rows.");
+  const headers=rows[ROW_HEADER].map(h=>String(h).trim());
+  const col={};
+  headers.forEach((h,i)=>{if(h&&col[h.toLowerCase()]===undefined)col[h.toLowerCase()]=i;});
+  const colIdx=name=>col[name.toLowerCase()];
+  const minRow=rows[ROW_MIN]||[],maxRow=rows[ROW_MAX]||[];
+  const limits={};
+  JUDGED_ITEMS.forEach(item=>{const ci=colIdx(item);if(ci!==undefined)limits[item]={min:parseLimit(minRow[ci]),max:parseLimit(maxRow[ci])};});
+  const vthCol=colIdx("VTH"),remarkCol=colIdx("Remark");
+  const failCounts={};JUDGED_ITEMS.forEach(it=>failCounts[it]=0);
+  const subPass={};
+  let input=0,output=0,vthLt15=0,vthGt6=0;
+  for(let r=ROW_DATA;r<rows.length;r++){
+    const row=rows[r]||[];
+    if(String(row[0]??"").trim()==="")break;
+    input++;
+    const vth=vthCol!==undefined?toNumber(row[vthCol]):null;
+    if(vth!==null){if(vth<1.5)vthLt15++;if(vth>6.0)vthGt6++;}
+    let diePassed=true;
+    JUDGED_ITEMS.forEach(item=>{
+      const ci=colIdx(item),lim=limits[item];
+      if(ci===undefined||!lim)return;
+      const val=toNumber(row[ci]);
+      const failed=val===null||(lim.min!==null&&val<lim.min)||(lim.max!==null&&val>lim.max);
+      if(failed){failCounts[item]++;diePassed=false;}
+    });
+    if(diePassed)output++;
+    const sub=remarkCol!==undefined?extractSubBatch(row[remarkCol]):null;
+    if(sub){if(subPass[sub]===undefined)subPass[sub]=0;if(diePassed)subPass[sub]++;}
+  }
+  const subBatchYield={};
+  Object.entries(subPass).forEach(([slot,pass])=>{subBatchYield[slot]=pass/UNITS_PER_SLOT;});
+  return{fileName:entry.name.replace(/^.*[\\\/]/,''),lotNo:baseName(entry.name),testDateTime:formatFileTime(entry),input,output,vthLt15,vthGt6,failCounts,subBatchYield};
+}
+
+document.getElementById('btnProcess').onclick=async()=>{
+  finalResults=[];
+  document.getElementById('btnExport').disabled=true;
+  document.getElementById('btnHeatmap').disabled=true;
+  document.getElementById('btnAutoFailHeatmap').disabled=true;
+  let entries=[];
+  try{entries=await collectExcelEntries(rptFiles);rptEntries=entries;}catch(err){addLog(`讀取失敗: ${err.message}`,true);return;}
+  for(const entry of entries){
+    try{const result=parseWorkbook(entry);finalResults.push(result);addLog(`成功: ${result.fileName} (Input:${result.input}, Output:${result.output})`);}
+    catch(err){addLog(`錯誤 [${entry.name}]: ${err.message}`,true);}
+  }
+  const ok=finalResults.length>0;
+  document.getElementById('btnExport').disabled=!ok;
+  document.getElementById('btnHeatmap').disabled=!ok;
+  document.getElementById('btnAutoFailHeatmap').disabled=!ok;
+};
+
+document.getElementById('btnExport').onclick=async()=>{
+  const wbEx=new ExcelJS.Workbook();
+  const ws=wbEx.addWorksheet('Summary');
+  const sorted=[...finalResults].sort((a,b)=>a.lotNo.localeCompare(b.lotNo,undefined,{sensitivity:"base"}));
+  const reportDate=new Date();
+  const headerArr=["Test Date/ Time","Report Date","Lot No.","Input","Output","Yield","VTH","","VTH < 1.5 V","","VTH > 6 V","","VFSD","","BVDSS 2","","BVDSS 1","","Delta3","","IPD-10V","","IDSS1","","IDSS2","","IDSS3","",...SLOTS];
+  const r1=ws.addRow(headerArr);
+  r1.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'4472C4'}};c.font={color:{argb:'FFFFFF'},bold:true};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border={bottom:{style:'thin',color:{argb:'2255A0'}}};});
+  [[7,8],[9,10],[11,12],[13,14],[15,16],[17,18],[19,20],[21,22],[23,24],[25,26],[27,28]].forEach(([f,t])=>{ws.mergeCells(1,f,1,t);});
+  for(let c=29;c<=52;c++){const cell=ws.getCell(1,c);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'70AD47'}};cell.font={color:{argb:'FFFFFF'},bold:true};cell.alignment={horizontal:'center'};}
+  const RED_FILL={type:'pattern',pattern:'solid',fgColor:{argb:'C00000'}};
+  const YEL_FONT={color:{argb:'FFFF00'},bold:true};
+  sorted.forEach((d,idx)=>{
+    const yieldVal=d.input>0?d.output/d.input:0;
+    const pair=count=>[count,d.input>0?count/d.input:0];
+    const rowData=[d.testDateTime,reportDate,d.lotNo,d.input,d.output,yieldVal,...pair(d.failCounts["VTH"]||0),...pair(d.vthLt15),...pair(d.vthGt6),...pair(d.failCounts["VFSD"]||0),...pair(d.failCounts["BVDSS 2"]||0),...pair(d.failCounts["BVDSS 1"]||0),...pair(d.failCounts["Delta3"]||0),...pair(d.failCounts["IPD-10V"]||0),...pair(d.failCounts["IDSS1"]||0),...pair(d.failCounts["IDSS2"]||0),...pair(d.failCounts["IDSS3"]||0),...SLOTS.map(s=>d.subBatchYield[s]!==undefined?d.subBatchYield[s]:"")];
+    const r=ws.addRow(rowData);
+    r.getCell(2).numFmt='yyyy/mm/dd';r.getCell(6).numFmt='0.00%';
+    for(let c=8;c<=28;c+=2)r.getCell(c).numFmt='0.00%';
+    for(let c=29;c<=52;c++)r.getCell(c).numFmt='0.00%';
+    if(idx%2===0){r.eachCell({includeEmpty:true},c=>{if(!c.fill||c.fill.pattern==='none'){c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'DCE6F1'}};}});}
+    const yieldCell=r.getCell(6);
+    if(yieldVal<0.90){yieldCell.fill=RED_FILL;yieldCell.font=YEL_FONT;}
+    const pctCols=[8,10,12,14,16,18,20,22,24,26,28];
+    pctCols.forEach(ci=>{const cell=r.getCell(ci);const val=cell.value;if(typeof val==="number"&&val>0.01){cell.fill=RED_FILL;cell.font=YEL_FONT;}});
+    for(let c=29;c<=52;c++){const cell=r.getCell(c);const v=cell.value;if(typeof v==="number"){let argb;if(v<0.80)argb='FFC00000';else if(v<0.90)argb='FFE67E22';else if(v<0.95)argb='FFF1C40F';else argb='FF27AE60';cell.fill={type:'pattern',pattern:'solid',fgColor:{argb}};cell.font={color:{argb:v<0.95?'FF000000':'FFFFFFFF'},bold:v<0.90};}}
+  });
+  ws.columns.forEach((c,i)=>{if(i===0||i===1)c.width=14;else if(i===2)c.width=24;else c.width=i>=28?8:10;});
+  ws.views=[{state:'frozen',ySplit:1}];
+  ws.autoFilter={from:'A1',to:'AZ1'};
+  const buf=await wbEx.xlsx.writeBuffer();
+  const blob=new Blob([buf]);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ULLD_Strip_Test_Summary_${todayStr()}.xlsx`;a.click();
+};
+
+function slotColor(v){if(v===null||v===undefined||v==="")return null;if(v<0.80)return{bg:'#c0392b',fg:'#fff'};if(v<0.90)return{bg:'#e67e22',fg:'#fff'};if(v<0.95)return{bg:'#c9a800',fg:'#000'};return{bg:'#27ae60',fg:'#fff'};}
+
+// ── AUTO FAIL HEATMAP DOWNLOAD ──────────────────────────────────────────────
+// Map from JUDGED_ITEMS display names → CSV column names used in hmConvertXlsArrayBuffer output
+const FAIL_PARAM_CSV_MAP={
+  "VTH":       "VTH",
+  "VFSD":      "VFSD",
+  "BVDSS 2":   "BVDSS_2",
+  "BVDSS 1":   "BVDSS_1",
+  "Delta3":    "Delta3",
+  "IPD-10V":   "IPD_10V",
+  "IDSS1":     "IDSS1",
+  "IDSS2":     "IDSS2",
+  "IDSS3":     "IDSS3"
+};
+// Param limits keyed by CSV column name (same as HM_ALL_PARAM_LIMITS keys)
+const FAIL_PARAM_LIMITS={
+  VTH:      [1.5,6.0],
+  VFSD:     [0.4,0.9],
+  BVDSS_2:  [19.65,23.0],
+  BVDSS_1:  [19.65,22.5],
+  Delta3:   [0.02,2.0],
+  IPD_10V:  [20.0,40.0],
+  IDSS1:    [0.0,10.0],
+  IDSS2:    [0.0,10.0],
+  IDSS3:    [0.0,10.0]
+};
+
+// Off-screen canvas used for batch heatmap rendering
+function autoHmRenderToCanvas(csvText, lotName, paramCsvName){
+  // Parse CSV
+  const parsed=hmParseCsv(csvText);
+  const headers=parsed.headers;
+  const rows=parsed.rows;
+  const idxOf=name=>headers.findIndex(h=>h.toLowerCase()===name.toLowerCase());
+  const idxBin=idxOf("Bin"),idxX=idxOf("X"),idxY=idxOf("Y"),idxWafer=idxOf("Wafer_ID"),idxParam=idxOf(paramCsvName);
+  if(idxBin<0||idxX<0||idxY<0||idxWafer<0||idxParam<0) return null;
+
+  // Build wafers map with param values
+  const wafers=new Map();
+  for(const cols of rows){
+    const bin=parseInt(cols[idxBin]||"",10);
+    const x=parseInt(cols[idxX]||"",10);
+    const y=parseInt(cols[idxY]||"",10);
+    const wid=parseInt(cols[idxWafer]||"",10);
+    if(!Number.isFinite(bin)||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(wid))continue;
+    const rawVal=cols[idxParam]||"";
+    const numVal=rawVal.trim()===""?null:Number(rawVal);
+    const hasVal=numVal!==null&&Number.isFinite(numVal);
+    if(!wafers.has(wid))wafers.set(wid,[]);
+    wafers.get(wid).push({Bin:bin,X:x,Y:y,Value:hasVal?numVal:0,HasValue:hasVal});
+  }
+  if(!wafers.size)return null;
+
+  const limits=FAIL_PARAM_LIMITS[paramCsvName];
+  const loLimit=limits?limits[0]:null;
+  const hiLimit=limits?limits[1]:null;
+
+  const allDies=[...wafers.values()].flat();
+  const maxX=allDies.length?Math.max(...allDies.map(d=>d.X)):13;
+  const maxY=allDies.length?Math.max(...allDies.map(d=>d.Y)):13;
+  const cellW=28,cellH=18,fontSize=6;
+  const TITLE_H=40,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
+  const waferW=maxX*cellW,waferH=maxY*cellH;
+  const totalW=MARGIN*2+COLS*waferW+(COLS-1)*WAFER_PAD_X;
+  const totalH=MARGIN*2+TITLE_H+GRID_ROWS*(WAFER_LABEL_H+waferH)+(GRID_ROWS-1)*WAFER_PAD_Y;
+
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.ceil(totalW);canvas.height=Math.ceil(totalH);
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,totalW,totalH);ctx.imageSmoothingEnabled=false;
+
+  let limitSuffix="";
+  if(loLimit!=null||hiLimit!=null){
+    const fmtG=(v,d)=>Number.isFinite(v)?Number(v.toPrecision(d)).toString():"";
+    limitSuffix=`  [${loLimit==null?"-∞":fmtG(loLimit,4)} ~ ${hiLimit==null?"+∞":fmtG(hiLimit,4)}]`;
+  }
+  const title=`${lotName} ${paramCsvName} Strip Heatmap${limitSuffix}`;
+  ctx.fillStyle="#0050c8";ctx.font="700 17px Arial";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText(title,totalW/2,TITLE_H/2);
+  ctx.font="700 11px Arial";ctx.textAlign="left";ctx.textBaseline="top";
+
+  const BIN_COLORS=new Map([[1,[0,200,0]],[2,[50,180,50]],[3,[200,200,0]],[4,[255,128,0]],[5,[255,0,0]],[6,[180,0,180]]]);
+  for(let gridCol=0;gridCol<COLS;gridCol++){
+    for(let gridRow=0;gridRow<GRID_ROWS;gridRow++){
+      const baseId=gridCol*GRID_ROWS+1;const wid=baseId+(GRID_ROWS-1-gridRow);
+      const ox=MARGIN+gridCol*(waferW+WAFER_PAD_X);let oy=MARGIN+TITLE_H+gridRow*(WAFER_LABEL_H+waferH+WAFER_PAD_Y);
+      ctx.fillStyle="#000";ctx.fillText(`#${wid}`,ox,oy+2);oy+=WAFER_LABEL_H;
+      const list=wafers.get(wid);if(!list)continue;
+      const lookup=new Map(list.map(d=>[`${d.X},${d.Y}`,d]));
+      for(let dy=maxY;dy>=1;dy--){
+        for(let dx=1;dx<=maxX;dx++){
+          const px=ox+(dx-1)*cellW,py=oy+(maxY-dy)*cellH;
+          const die=lookup.get(`${dx},${dy}`);
+          let color=[255,255,255];let oos=false;
+          if(die){
+            oos=die.HasValue&&((loLimit!=null&&die.Value<loLimit)||(hiLimit!=null&&die.Value>hiLimit));
+            color=oos?[210,210,210]:(BIN_COLORS.get(die.Bin)||[160,160,160]);
+          }
+          ctx.fillStyle=`rgb(${color[0]},${color[1]},${color[2]})`;
+          ctx.fillRect(px,py,Math.max(1,cellW-1),Math.max(1,cellH-1));
+          if(die&&die.HasValue){
+            const fmtG=(v,d)=>Number(v.toPrecision(d)).toString();
+            const text=fmtG(die.Value,4);
+            ctx.fillStyle=oos?"#a00000":"#000";
+            ctx.font=`${fontSize}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";
+            ctx.fillText(text,px+cellW/2,py+cellH/2);
+          }
+        }
+      }
+    }
+  }
+  return canvas;
+}
+
+function canvasToPngBlob(canvas){
+  return new Promise(resolve=>{
+    canvas.toBlob(blob=>resolve(blob),"image/png");
+  });
+}
+
+document.getElementById('btnAutoFailHeatmap').onclick=async()=>{
+  const btn=document.getElementById('btnAutoFailHeatmap');
+  btn.disabled=true;btn.textContent="處理中...";
+
+  try{
+    // 1. Identify which params have fail rate > 1% in ANY lot
+    const THRESHOLD=0.01;
+    // failedParams: Set of JUDGED_ITEMS display names
+    const failedParams=new Set();
+    // failedLots: Map<lotName, Set<paramDisplayName>> — which lots have fails (for labelling)
+    const failedLots=new Map();
+
+    for(const d of finalResults){
+      const lotKey=d.lotNo||d.fileName||"unknown";
+      for(const item of JUDGED_ITEMS){
+        const count=d.failCounts[item]||0;
+        const rate=d.input>0?count/d.input:0;
+        if(rate>THRESHOLD){
+          failedParams.add(item);
+          if(!failedLots.has(lotKey))failedLots.set(lotKey,new Set());
+          failedLots.get(lotKey).add(item);
+        }
+      }
+    }
+
+    if(failedParams.size===0){
+      alert("所有參數 fail rate 均 ≤ 1%，無需產生 Heatmap。");
+      btn.disabled=false;btn.textContent="下載 Fail Heatmap";
+      return;
+    }
+
+    addLog(`偵測到 fail rate > 1% 的參數：${[...failedParams].join(", ")}`);
+
+    // 2. Convert each raw XLS file that belongs to a lot with fails to CSV, then render heatmaps
+    const zip=new JSZip();
+    let pngCount=0;
+
+    for(const entry of rptEntries){
+      // Determine which lot this entry belongs to
+      const lotName=entry.name.replace(/^.*[\\/]/,"").replace(/\.[^.]+$/,"");
+
+      // Find the matching finalResult to know which params failed
+      const result=finalResults.find(r=>
+        (r.lotNo||"")===lotName ||
+        (r.fileName||"").replace(/\.[^.]+$/,"")=== lotName
+      );
+      if(!result)continue;
+
+      // Determine which params failed for this lot
+      const lotFailParams=[];
+      for(const item of JUDGED_ITEMS){
+        const count=result.failCounts[item]||0;
+        const rate=result.input>0?count/result.input:0;
+        if(rate>THRESHOLD) lotFailParams.push(item);
+      }
+      if(lotFailParams.length===0)continue;
+
+      // Convert XLS → CSV using Page 2's existing parser
+      let csvText;
+      try{
+        csvText=hmConvertXlsArrayBuffer(entry.data);
+      }catch(err){
+        addLog(`[警告] ${entry.name} 無法轉換 CSV: ${err.message}`,true);
+        continue;
+      }
+
+      // Render one PNG per failing param
+      for(const item of lotFailParams){
+        const csvParamName=FAIL_PARAM_CSV_MAP[item];
+        if(!csvParamName)continue;
+        try{
+          const canvas=autoHmRenderToCanvas(csvText,lotName,csvParamName);
+          if(!canvas){addLog(`[警告] ${lotName} ${item} 無法渲染 heatmap`,true);continue;}
+          const blob=await canvasToPngBlob(canvas);
+          zip.file(`${lotName}_${csvParamName}.png`,blob);
+          pngCount++;
+          addLog(`  ✓ ${lotName} ${item} heatmap`);
+        }catch(err){
+          addLog(`[警告] ${lotName} ${item} 渲染失敗: ${err.message}`,true);
+        }
+      }
+    }
+
+    if(pngCount===0){
+      alert("無法從 XLS 產生任何 heatmap（可能 rptFiles 中沒有 .xls 格式的原始資料）。");
+      btn.disabled=false;btn.textContent="下載 Fail Heatmap";
+      return;
+    }
+
+    // 3. Pack & download zip
+    const zipBlob=await zip.generateAsync({type:"blob"});
+    const url=URL.createObjectURL(zipBlob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`FailHeatmap_${todayStr()}.zip`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    addLog(`✅ 已產生 ${pngCount} 張 heatmap，打包下載 FailHeatmap_${todayStr()}.zip`);
+
+  }catch(err){
+    addLog(`Fail Heatmap 失敗: ${err.message}`,true);
+  }finally{
+    btn.disabled=false;btn.textContent="下載 Fail Heatmap";
+    document.getElementById('btnAutoFailHeatmap').disabled=finalResults.length===0;
+  }
+};
+
+document.getElementById('btnHeatmap').onclick=()=>{
+  const grid=document.getElementById('heatmapGrid');
+  const modal=document.getElementById('heatmapModal');
+  const title=document.getElementById('heatmapTitle');
+  grid.innerHTML="";
+  const slotSums={},slotCounts={};
+  SLOTS.forEach(s=>{slotSums[s]=0;slotCounts[s]=0;});
+  finalResults.forEach(d=>{SLOTS.forEach(s=>{const v=d.subBatchYield[s];if(typeof v==="number"){slotSums[s]+=v;slotCounts[s]++;}});});
+  const sorted=[...finalResults].sort((a,b)=>a.lotNo.localeCompare(b.lotNo,undefined,{sensitivity:"base"}));
+  title.textContent=`Slot Yield Heatmap — ${finalResults.length} Lots (平均良率)`;
+  SLOTS.forEach((s)=>{
+    const avg=slotCounts[s]>0?slotSums[s]/slotCounts[s]:null;
+    const col=slotColor(avg);
+    const cell=document.createElement('div');
+    cell.className='heatmap-cell'+(avg===null?' heatmap-empty':'');
+    if(col){cell.style.background=col.bg;cell.style.color=col.fg;}
+    const ttLines=sorted.map(d=>{const v=d.subBatchYield[s];const pct=typeof v==="number"?(v*100).toFixed(1)+"%":"—";return `${d.lotNo}: ${pct}`;}).join('\n');
+    cell.title=`Slot ${s}\n${ttLines}`;
+    cell.innerHTML=`<span class="slot-id">Slot ${s}</span><span class="slot-val">${avg!==null?(avg*100).toFixed(1)+'%':'—'}</span>`;
+    grid.appendChild(cell);
+  });
+  modal.classList.add('open');
+};
+document.getElementById('modalClose').onclick=()=>{document.getElementById('heatmapModal').classList.remove('open');};
+document.getElementById('heatmapModal').onclick=function(e){if(e.target===this)this.classList.remove('open');};
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE 2 — STRIP HEATMAP
+// ══════════════════════════════════════════════════════════════════════════════
+const HM_BIN_COLORS=new Map([[1,[0,200,0]],[2,[50,180,50]],[3,[200,200,0]],[4,[255,128,0]],[5,[255,0,0]],[6,[180,0,180]]]);
+const HM_BIN_DEFAULT=[160,160,160];
+const HM_COLOR_MISSING=[255,255,255];
+const HM_COLOR_OUT_OF_SPEC=[210,210,210];
+const HM_COLOR_OOS_LABEL="#a00000";
+const HM_COLOR_TITLE_FG="#0050c8";
+const HM_WAFER_DIE_TOTAL=169;
+const HM_PARAM_LIMITS={VTH:[1.5,6.0],VFSD:[0.4,0.9],BVDSS_2:[19.65,23.0],BVDSS_1:[19.65,22.5],Delta3:[0.02,2.0],IPD_10V:[20.0,40.0],IDSS1:[0.0,10.0],IDSS2:[0.0,10.0],IDSS3:[0.0,10.0]};
+const HM_BVDSS_BIN_LIMITS={BVDSS_bin1:[19.65,20.9],BVDSS_bin2:[20.9,22.5]};
+const HM_ALL_PARAM_LIMITS=Object.assign({},HM_PARAM_LIMITS,HM_BVDSS_BIN_LIMITS);
+const HM_YIELD_PARAMS=Object.keys(HM_PARAM_LIMITS);
+const HM_SKIP_PARAMS=new Set(["Serial","Bin","X","Y","X_old","Y_old","Wafer_ID"]);
+
+const hm$=id=>document.getElementById(id);
+const hmEls={
+  csvFile:hm$("hm-csvFile"),xlsFile:hm$("hm-xlsFile"),convertXlsBtn:hm$("hm-convertXlsBtn"),
+  xlsStatus:hm$("hm-xlsStatus"),fileStatus:hm$("hm-fileStatus"),topStatus:hm$("hm-topStatus"),
+  param:hm$("hm-param"),useLo:hm$("hm-useLo"),useHi:hm$("hm-useHi"),lo:hm$("hm-lo"),hi:hm$("hm-hi"),
+  cellW:hm$("hm-cellW"),cellH:hm$("hm-cellH"),fontSize:hm$("hm-fontSize"),
+  renderBtn:hm$("hm-renderBtn"),downloadPngBtn:hm$("hm-downloadPngBtn"),yieldBtn:hm$("hm-yieldBtn"),
+  downloadYieldBtn:hm$("hm-downloadYieldBtn"),empty:hm$("hm-empty"),canvasShell:hm$("hm-canvasShell"),
+  canvas:hm$("hm-canvas"),report:hm$("hm-report"),reportTitle:hm$("hm-reportTitle"),yieldRows:hm$("hm-yieldRows")
+};
+
+let hmHeaders=[],hmRows=[],hmWafers=new Map(),hmFullDies=[],hmCsvBase="strip",hmLastYieldResults=[];
+
+hmEls.convertXlsBtn.addEventListener("click",hmConvertXlsFile);
+hmEls.csvFile.addEventListener("change",hmLoadCsv);
+hmEls.param.addEventListener("change",()=>{hmApplyParamDefaults();hmRenderIfReady(false);});
+hmEls.useLo.addEventListener("change",hmRenderIfReady);
+hmEls.useHi.addEventListener("change",hmRenderIfReady);
+hmEls.lo.addEventListener("change",hmRenderIfReady);
+hmEls.hi.addEventListener("change",hmRenderIfReady);
+hmEls.cellW.addEventListener("change",hmRenderIfReady);
+hmEls.cellH.addEventListener("change",hmRenderIfReady);
+hmEls.fontSize.addEventListener("change",hmRenderIfReady);
+hmEls.renderBtn.addEventListener("click",()=>hmRenderIfReady(true));
+hmEls.downloadPngBtn.addEventListener("click",hmDownloadPng);
+hmEls.yieldBtn.addEventListener("click",hmRenderYieldReport);
+hmEls.downloadYieldBtn.addEventListener("click",hmDownloadYieldCsv);
+
+async function hmConvertXlsFile(){
+  const file=hmEls.xlsFile.files&&hmEls.xlsFile.files[0];
+  if(!file){hmSetXlsStatus("請先選擇 XLS 檔案。",true);return;}
+  try{
+    hmEls.convertXlsBtn.disabled=true;hmSetXlsStatus("讀取 XLS...",false);
+    const csvText=hmConvertXlsArrayBuffer(await file.arrayBuffer());
+    const outName=file.name.replace(/\.[^.]+$/,"")+".converted.csv";
+    hmDownloadText(outName,csvText,"text/csv;charset=utf-8");
+    hmSetXlsStatus(`完成：已產生 ${outName}。`,false);
+  }catch(err){hmSetXlsStatus(`Error: ${err.message}`,true);}
+  finally{hmEls.convertXlsBtn.disabled=false;}
+}
+function hmSetXlsStatus(text,isError){hmEls.xlsStatus.textContent=text;hmEls.xlsStatus.className=isError?"status error":"status";}
+
+function hmConvertXlsArrayBuffer(buffer){
+  const raw=new Uint8Array(buffer);
+  const wb=hmExtractWorkbookStream(raw);
+  if(!wb)throw new Error("無法解析 OLE Compound Document，請確認為標準 .xls 格式。");
+  const sst=[];
+  const ldOffset=hmFindLoggerDataOffset(wb,sst);
+  if(ldOffset<0)throw new Error("找不到 LoggerData 分頁，請確認 XLS 格式。");
+  const allRows=hmParseSheetRows(wb,ldOffset,sst);
+  const minRow=allRows.get(3)||new Map();
+  const maxRow=allRows.get(4)||new Map();
+  const lim={vthLo:hmGetD(minRow,4,1.5),vthHi:hmGetD(maxRow,4,6.0),vfsdLo:hmGetD(minRow,7,0.4),vfsdHi:hmGetD(maxRow,7,0.9),bv2Lo:hmGetD(minRow,8,19.65),bv2Hi:hmGetD(maxRow,8,23.0),bv1Lo:hmGetD(minRow,9,19.65),bv1Hi:hmGetD(maxRow,9,22.5),deltaLo:hmGetD(minRow,10,0.02),deltaHi:hmGetD(maxRow,10,2.0),ipdLo:hmGetD(minRow,11,20.0),ipdHi:hmGetD(maxRow,11,40.0),idss:hmGetD(maxRow,12,10.0)};
+  const out=["Serial,Bin,X,Y,X_old,Y_old,VTH,GET VTH <1.5V,GET VTH >6V,VFSD,BVDSS_2,BVDSS_1,Delta3,IPD_10V,IDSS1,IDSS2,IDSS3,BVDSS_bin1,BVDSS_bin2,Wafer_ID"];
+  let globalSerial=0;let converted=0;
+  const rowIndexes=[...allRows.keys()].sort((a,b)=>a-b);
+  for(const rowIdx of rowIndexes){
+    if(rowIdx<10)continue;
+    const row=allRows.get(rowIdx);
+    const remark=hmGetS(row,17);if(!remark.trim())continue;
+    let waferStr=remark.trim();if(waferStr.length>=2)waferStr=waferStr.slice(-2);
+    const waferId=parseInt(waferStr,10);if(!Number.isFinite(waferId))continue;
+    globalSerial++;
+    const xOldObj=row.get(2);const xOld=typeof xOldObj==="number"?Math.trunc(xOldObj):0;if(xOld<=0)continue;
+    const x=Math.trunc((xOld+12)/13);const y=13-((xOld-1)%13);
+    const serialObj=row.get(0);const serial=typeof serialObj==="number"?Math.trunc(serialObj):globalSerial;
+    const vth=hmFmtD(row,4);const gtvLo=hmFmtD(row,5);const gtvHi=hmFmtD(row,6);const vfsd=hmFmtD(row,7);const bv2=hmFmtD(row,8);const bv1=hmFmtD(row,9);const delta=hmFmtD(row,10);const ipd=hmFmtD(row,11);const idss1=hmFmtD(row,12);const idss2=hmFmtD(row,13);const idss3=hmFmtD(row,14);const bvBin1=hmFmtD(row,15);const bvBin2=hmFmtD(row,16);
+    const binObj=row.get(1);const bin=typeof binObj==="number"?Math.trunc(binObj):hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim);
+    out.push([serial,bin,x,y,xOld,0,vth,gtvLo,gtvHi,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,bvBin1,bvBin2,waferId].join(","));converted++;
+  }
+  if(!converted)throw new Error("LoggerData 中沒有可轉換的量測資料。");
+  return out.join("\r\n")+"\r\n";
+}
+
+function hmExtractWorkbookStream(raw){
+  if(raw.length<512)return null;
+  const view=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
+  const secSize=1<<view.getInt16(30,true);
+  const fatSectors=[];
+  for(let i=0;i<109;i++){const sec=view.getInt32(76+i*4,true);if(sec<0)break;fatSectors.push(sec);}
+  const fat=new Int32Array(fatSectors.length*secSize/4);
+  for(let fi=0;fi<fatSectors.length;fi++){const off=512+fatSectors[fi]*secSize;for(let j=0;j<secSize/4;j++){if(off+j*4+4<=raw.length)fat[fi*secSize/4+j]=view.getInt32(off+j*4,true);}}
+  const dirSec=view.getInt32(48,true);const dirOff=512+dirSec*secSize;let wbStart=-1;
+  for(let e=0;e<32;e++){
+    const entryOff=dirOff+e*128;if(entryOff+128>raw.length)break;
+    const nameLen=view.getInt16(entryOff+64,true);const entType=raw[entryOff+66];if(entType===0)continue;
+    const startSec=view.getInt32(entryOff+116,true);let name="";
+    if(nameLen>0&&nameLen<=64)name=hmDecodeUtf16(raw.slice(entryOff,entryOff+nameLen)).replace(/\0+$/g,"");
+    if(name.toLowerCase()==="workbook"||name.toLowerCase()==="book"){wbStart=startSec;break;}
+  }
+  if(wbStart<0)return null;
+  const chunks=[];let total=0;let cur=wbStart;const visited=new Set();
+  while(cur>=0&&cur<0x7ffffff0){if(visited.has(cur))break;visited.add(cur);const off=512+cur*secSize;if(off+secSize>raw.length)break;const chunk=raw.slice(off,off+secSize);chunks.push(chunk);total+=chunk.length;if(cur>=fat.length)break;cur=fat[cur];}
+  const wbArr=new Uint8Array(total);let p=0;for(const chunk of chunks){wbArr.set(chunk,p);p+=chunk.length;}
+  return wbArr;
+}
+
+function hmFindLoggerDataOffset(wb,sst){
+  const view=new DataView(wb.buffer,wb.byteOffset,wb.byteLength);
+  const sheets=[];let pos=0;
+  while(pos<wb.length-4){
+    const rt=view.getUint16(pos,true);const rl=view.getUint16(pos+2,true);const data=pos+4;const boundary=data+rl;
+    if(rt===0x00fc&&rl>=8){
+      const unique=view.getInt32(data+4,true);let sp=data+8;
+      while(sst.length<unique&&sp+3<=boundary){
+        const cc=view.getUint16(sp,true);const fl=wb[sp+2];sp+=3;let richCount=0;
+        if((fl&0x08)!==0&&sp+2<=boundary){richCount=view.getUint16(sp,true);sp+=2;}
+        if((fl&0x04)!==0&&sp+4<=boundary){const ph=view.getInt32(sp,true);sp+=4+ph;}
+        if((fl&0x01)===0){const end=Math.min(sp+cc,boundary);sst.push(hmDecodeLatin1(wb.slice(sp,end)));sp+=cc;}
+        else{const end=Math.min(sp+cc*2,boundary);sst.push(hmDecodeUtf16(wb.slice(sp,end)));sp+=cc*2;}
+        sp+=richCount*4;
+      }
+    }
+    if(rt===0x0085&&rl>=7){
+      const sheetOffset=view.getInt32(data,true);const nameLen=wb[data+6];const enc=wb[data+7];const nameStart=data+8;
+      const name=enc===0?hmDecodeLatin1(wb.slice(nameStart,Math.min(nameStart+nameLen,boundary))):hmDecodeUtf16(wb.slice(nameStart,Math.min(nameStart+nameLen*2,boundary)));
+      sheets.push({name:name.replace(/\0+$/g,""),offset:sheetOffset});
+    }
+    pos+=4+rl;
+  }
+  const logger=sheets.find(s=>s.name.toLowerCase()==="loggerdata");
+  if(logger)return logger.offset;
+  return sheets.length?sheets[sheets.length-1].offset:-1;
+}
+
+function hmParseSheetRows(wb,startOffset,sst){
+  const view=new DataView(wb.buffer,wb.byteOffset,wb.byteLength);
+  const parsed=new Map();
+  const setCell=(r,c,v)=>{if(!parsed.has(r))parsed.set(r,new Map());parsed.get(r).set(c,v);};
+  let pos=startOffset;let started=false;
+  while(pos<wb.length-4){
+    const rt=view.getUint16(pos,true);const rl=view.getUint16(pos+2,true);const data=pos+4;
+    if(rt===0x0809){if(started)break;started=true;}
+    if(started){
+      if(rt===0x0203&&rl>=14){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const v=view.getFloat64(data+6,true);setCell(r,c,v);}
+      else if(rt===0x00fd&&rl>=10){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const si=view.getInt32(data+6,true);setCell(r,c,si<sst.length?sst[si]:"");}
+      else if(rt===0x027e&&rl>=10){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const rkv=view.getInt32(data+6,true);setCell(r,c,hmDecodeRK(rkv));}
+      else if(rt===0x00bd&&rl>=6){const r=view.getUint16(data,true);const cFirst=view.getUint16(data+2,true);const nCells=Math.floor((rl-6)/6);for(let i=0;i<nCells;i++){const rkOff=data+4+i*6+2;if(rkOff+4<=data+rl)setCell(r,cFirst+i,hmDecodeRK(view.getInt32(rkOff,true)));}}
+      else if(rt===0x000a){break;}
+    }
+    pos+=4+rl;
+  }
+  return parsed;
+}
+
+function hmDecodeRK(rkv){let v;if((rkv&0x02)!==0){v=rkv>>2;}else{const buf=new ArrayBuffer(8);const dv=new DataView(buf);dv.setUint32(0,0,true);dv.setUint32(4,rkv&0xfffffffc,true);v=dv.getFloat64(0,true);}if((rkv&0x01)!==0)v/=100;return v;}
+function hmGetD(row,colIndex,fallback){if(!row.has(colIndex))return fallback;const value=row.get(colIndex);if(typeof value==="number")return value;const text=String(value??"").trim().replace(/[^\d.\-+eE].*$/,"");const parsed=Number(text);return Number.isFinite(parsed)?parsed:fallback;}
+function hmGetS(row,colIndex){return row.has(colIndex)?String(row.get(colIndex)??""):"";}
+function hmFmtD(row,colIndex){if(!row.has(colIndex))return "";const value=row.get(colIndex);return typeof value==="number"?hmFormatG(value,6):"";}
+function hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim){const dVth=Number(vth),dVfsd=Number(vfsd),dBv2=Number(bv2),dBv1=Number(bv1),dDelta=Number(delta),dIpd=Number(ipd),dI1=Number(idss1),dI2=Number(idss2),dI3=Number(idss3);if(![dVth,dVfsd,dBv2,dBv1,dDelta,dIpd,dI1,dI2,dI3].every(Number.isFinite))return 6;if(dIpd<lim.ipdLo||dIpd>lim.ipdHi)return 5;if(dVfsd<lim.vfsdLo||dVfsd>lim.vfsdHi)return 3;if(dVth<lim.vthLo||dVth>lim.vthHi)return 6;if(dBv2<lim.bv2Lo||dBv2>lim.bv2Hi)return 6;if(dBv1<lim.bv1Lo||dBv1>lim.bv1Hi)return 6;if(dDelta<lim.deltaLo||dDelta>lim.deltaHi)return 6;if(dI1>lim.idss||dI2>lim.idss||dI3>lim.idss)return 6;if(dI1<0||dI2<0||dI3<0)return 6;return 1;}
+function hmDecodeUtf16(bytes){return new TextDecoder("utf-16le").decode(bytes);}
+function hmDecodeLatin1(bytes){return new TextDecoder("windows-1252").decode(bytes);}
+
+async function hmLoadCsv(event){
+  const file=event.target.files&&event.target.files[0];if(!file)return;
+  try{
+    const text=await file.text();hmCsvBase=file.name.replace(/\.[^.]+$/,"");
+    const parsed=hmParseCsv(text);hmHeaders=parsed.headers;hmRows=parsed.rows;
+    hmBuildData();hmPopulateParams();hmApplyParamDefaults();
+    const dieCount=[...hmWafers.values()].reduce((sum,list)=>sum+list.length,0);
+    const msg=`已載入 ${hmWafers.size} 片 strip，共 ${dieCount.toLocaleString()} 個 die。`;
+    hmEls.fileStatus.textContent=msg;hmEls.fileStatus.className="status";
+    hmEls.topStatus.textContent=`${file.name} | ${msg}`;
+    hmEnableControls(true);hmRenderIfReady(true);
+  }catch(err){
+    hmHeaders=[];hmRows=[];hmWafers=new Map();hmFullDies=[];hmEnableControls(false);
+    hmEls.fileStatus.textContent=`Error: ${err.message}`;hmEls.fileStatus.className="status error";
+    hmEls.topStatus.textContent="CSV 讀取失敗。";
+  }
+}
+
+function hmParseCsv(text){
+  const parsedRows=[];let row=[];let cell="";let inQuotes=false;
+  const src=text.replace(/^\uFEFF/,"");
+  for(let i=0;i<src.length;i++){
+    const ch=src[i];
+    if(inQuotes){if(ch==='"'&&src[i+1]==='"'){cell+='"';i++;}else if(ch==='"')inQuotes=false;else cell+=ch;}
+    else if(ch==='"')inQuotes=true;
+    else if(ch===","){row.push(cell);cell="";}
+    else if(ch==="\n"){row.push(cell.replace(/\r$/,""));parsedRows.push(row);row=[];cell="";}
+    else{cell+=ch;}
+  }
+  if(cell.length||row.length){row.push(cell.replace(/\r$/,""));parsedRows.push(row);}
+  const nonEmpty=parsedRows.filter(r=>r.some(v=>String(v).trim()!==""));
+  if(!nonEmpty.length)throw new Error("CSV 為空。");
+  return{headers:nonEmpty[0].map(h=>h.trim()),rows:nonEmpty.slice(1)};
+}
+
+function hmBuildData(){
+  const idxBin=hmIdxOf("Bin"),idxX=hmIdxOf("X"),idxY=hmIdxOf("Y"),idxWafer=hmIdxOf("Wafer_ID");
+  if(idxBin<0||idxX<0||idxY<0||idxWafer<0)throw new Error("CSV 缺少必要欄位：Bin / X / Y / Wafer_ID");
+  const yieldIdx=new Map();
+  for(const name of HM_YIELD_PARAMS){const idx=hmIdxOf(name);if(idx>=0)yieldIdx.set(name,idx);}
+  hmWafers=new Map();hmFullDies=[];
+  for(const cols of hmRows){
+    const bin=parseInt(hmCol(cols,idxBin),10),x=parseInt(hmCol(cols,idxX),10),y=parseInt(hmCol(cols,idxY),10),wid=parseInt(hmCol(cols,idxWafer),10);
+    if(!Number.isFinite(bin)||!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(wid))continue;
+    if(!hmWafers.has(wid))hmWafers.set(wid,[]);
+    hmWafers.get(wid).push({Bin:bin,X:x,Y:y,Value:0,HasValue:false});
+    const params=new Map();
+    for(const[name,idx]of yieldIdx){const value=hmParseNumber(hmCol(cols,idx));params.set(name,{HasValue:value!=null,Value:value==null?0:value});}
+    hmFullDies.push({WaferId:wid,X:x,Y:y,Params:params});
+  }
+  if(!hmWafers.size)throw new Error("找不到有效 die 資料。");
+}
+
+function hmPopulateParams(){
+  hmEls.param.innerHTML="";
+  for(const h of hmHeaders){if(!HM_SKIP_PARAMS.has(h))hmEls.param.add(new Option(h,h));}
+  if(hmEls.param.options.length){const firstKnown=Object.keys(HM_PARAM_LIMITS).find(p=>hmIdxOf(p)>=0);hmEls.param.value=firstKnown||hmEls.param.options[0].value;}
+}
+
+function hmApplyParamDefaults(){
+  const limits=HM_ALL_PARAM_LIMITS[hmEls.param.value];
+  if(limits){hmEls.lo.value=limits[0];hmEls.hi.value=limits[1];hmEls.useLo.checked=true;hmEls.useHi.checked=true;}
+  else{hmEls.useLo.checked=false;hmEls.useHi.checked=false;}
+}
+
+function hmEnableControls(enabled){for(const el of[hmEls.renderBtn,hmEls.downloadPngBtn,hmEls.yieldBtn])el.disabled=!enabled;}
+
+function hmReloadParam(paramName){
+  const idxParam=hmIdxOf(paramName),idxX=hmIdxOf("X"),idxY=hmIdxOf("Y"),idxWafer=hmIdxOf("Wafer_ID");
+  if(idxParam<0)return;
+  const lookups=new Map();
+  for(const[wid,list]of hmWafers){const lu=new Map();for(const die of list){die.Value=0;die.HasValue=false;lu.set(`${die.X},${die.Y}`,die);}lookups.set(wid,lu);}
+  for(const cols of hmRows){
+    const x=parseInt(hmCol(cols,idxX),10),y=parseInt(hmCol(cols,idxY),10),wid=parseInt(hmCol(cols,idxWafer),10);
+    const lu=lookups.get(wid);if(!lu)continue;
+    const die=lu.get(`${x},${y}`);if(!die)continue;
+    const value=hmParseNumber(hmCol(cols,idxParam));if(value!=null){die.Value=value;die.HasValue=true;}
+  }
+}
+
+function hmRenderIfReady(force){
+  if(!force&&(!hmWafers.size||hmEls.canvasShell.hidden))return;
+  if(!hmWafers.size||!hmEls.param.value)return;
+  try{hmReloadParam(hmEls.param.value);hmRenderHeatmap();hmEls.empty.hidden=true;hmEls.canvasShell.hidden=false;hmEls.downloadPngBtn.disabled=false;}
+  catch(err){hmEls.fileStatus.textContent=`Error: ${err.message}`;hmEls.fileStatus.className="status error";}
+}
+
+function hmRenderHeatmap(){
+  const ctx=hmEls.canvas.getContext("2d");
+  const paramName=hmEls.param.value;
+  const loLimit=hmEls.useLo.checked?Number(hmEls.lo.value):null;
+  const hiLimit=hmEls.useHi.checked?Number(hmEls.hi.value):null;
+  const cellW=hmClampInt(Number(hmEls.cellW.value),4,80,28);
+  const cellH=hmClampInt(Number(hmEls.cellH.value),4,60,18);
+  const fontSize=hmClampInt(Number(hmEls.fontSize.value),4,20,6);
+  const TITLE_H=40,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
+  const allDies=[...hmWafers.values()].flat();
+  const maxX=allDies.length?Math.max(...allDies.map(d=>d.X)):13;
+  const maxY=allDies.length?Math.max(...allDies.map(d=>d.Y)):13;
+  const waferW=maxX*cellW,waferH=maxY*cellH;
+  const totalW=MARGIN*2+COLS*waferW+(COLS-1)*WAFER_PAD_X;
+  const totalH=MARGIN*2+TITLE_H+GRID_ROWS*(WAFER_LABEL_H+waferH)+(GRID_ROWS-1)*WAFER_PAD_Y;
+  hmEls.canvas.width=Math.ceil(totalW);hmEls.canvas.height=Math.ceil(totalH);
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,totalW,totalH);ctx.imageSmoothingEnabled=false;
+  let limitSuffix="";
+  if(loLimit!=null||hiLimit!=null){limitSuffix=`  [${loLimit==null?"-∞":hmFormatG(loLimit,4)} ~ ${hiLimit==null?"+∞":hmFormatG(hiLimit,4)}]`;}
+  const title=`${hmCsvBase} ${paramName} Strip Heatmap${limitSuffix}`;
+  ctx.fillStyle=HM_COLOR_TITLE_FG;ctx.font="700 17px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(title,totalW/2,TITLE_H/2);
+  ctx.font="700 11px Arial";ctx.textAlign="left";ctx.textBaseline="top";
+  for(let gridCol=0;gridCol<COLS;gridCol++){
+    for(let gridRow=0;gridRow<GRID_ROWS;gridRow++){
+      const baseId=gridCol*GRID_ROWS+1;const wid=baseId+(GRID_ROWS-1-gridRow);
+      const ox=MARGIN+gridCol*(waferW+WAFER_PAD_X);let oy=MARGIN+TITLE_H+gridRow*(WAFER_LABEL_H+waferH+WAFER_PAD_Y);
+      ctx.fillStyle="#000";ctx.fillText(`#${wid}`,ox,oy+2);oy+=WAFER_LABEL_H;
+      const list=hmWafers.get(wid);if(!list)continue;
+      const lookup=new Map(list.map(d=>[`${d.X},${d.Y}`,d]));
+      for(let dy=maxY;dy>=1;dy--){
+        for(let dx=1;dx<=maxX;dx++){
+          const px=ox+(dx-1)*cellW,py=oy+(maxY-dy)*cellH;
+          const die=lookup.get(`${dx},${dy}`);let color=HM_COLOR_MISSING;let oos=false;
+          if(die){oos=die.HasValue&&((loLimit!=null&&die.Value<loLimit)||(hiLimit!=null&&die.Value>hiLimit));color=oos?HM_COLOR_OUT_OF_SPEC:(HM_BIN_COLORS.get(die.Bin)||HM_BIN_DEFAULT);}
+          ctx.fillStyle=`rgb(${color[0]},${color[1]},${color[2]})`;ctx.fillRect(px,py,Math.max(1,cellW-1),Math.max(1,cellH-1));
+          if(die&&die.HasValue){const text=hmFormatG(die.Value,4);ctx.fillStyle=oos?HM_COLOR_OOS_LABEL:"#000";ctx.font=`${fontSize}px Arial`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(text,px+cellW/2,py+cellH/2);}
+        }
+      }
+    }
+  }
+  hmEls.topStatus.textContent=`完成 | ${totalW}×${totalH}px`;
+}
+
+function hmRenderYieldReport(){
+  if(!hmFullDies.length)return;
+  const byWafer=new Map();
+  for(const fd of hmFullDies){if(!byWafer.has(fd.WaferId))byWafer.set(fd.WaferId,[]);byWafer.get(fd.WaferId).push(fd);}
+  hmLastYieldResults=[];
+  for(const wid of[...byWafer.keys()].sort((a,b)=>a-b)){
+    const dies=byWafer.get(wid);let failCount=0;
+    for(const fd of dies){let isFail=false;for(const yp of HM_YIELD_PARAMS){const pv=fd.Params.get(yp);if(!pv||!pv.HasValue){isFail=true;break;}const[lo,hi]=HM_PARAM_LIMITS[yp];if(pv.Value<lo||pv.Value>hi){isFail=true;break;}}if(isFail)failCount++;}
+    const missingDies=Math.max(0,HM_WAFER_DIE_TOTAL-dies.length);const totalFail=failCount+missingDies;const passCount=Math.max(0,HM_WAFER_DIE_TOTAL-totalFail);const yieldPct=passCount/HM_WAFER_DIE_TOTAL*100;
+    hmLastYieldResults.push({WaferId:wid,MeasuredDies:dies.length,PassCount:passCount,FailCount:totalFail,Yield:yieldPct});
+  }
+  hmEls.yieldRows.innerHTML="";
+  for(const r of hmLastYieldResults){
+    const tr=document.createElement("tr");const cls=r.Yield<75?"yield-bad":r.Yield<90?"yield-warn":"yield-good";
+    tr.innerHTML=`<td>#${r.WaferId}</td><td>${r.MeasuredDies}</td><td>${r.PassCount}</td><td>${r.FailCount}</td><td class="${cls}">${r.Yield.toFixed(2)} %</td>`;
+    hmEls.yieldRows.appendChild(tr);
+  }
+  hmEls.reportTitle.textContent=`良率報表 — ${hmCsvBase}`;hmEls.report.hidden=false;hmEls.report.scrollIntoView({block:"nearest"});
+}
+
+function hmDownloadYieldCsv(){
+  if(!hmLastYieldResults.length)hmRenderYieldReport();
+  const lines=["Wafer_ID,Measured_Dies,Pass,Fail,Yield(%)"];
+  for(const r of hmLastYieldResults)lines.push(`${r.WaferId},${r.MeasuredDies},${r.PassCount},${r.FailCount},${r.Yield.toFixed(2)}`);
+  hmDownloadText(`${hmCsvBase}_yield.csv`,lines.join("\r\n")+"\r\n","text/csv;charset=utf-8");
+}
+function hmDownloadPng(){const link=document.createElement("a");link.download=`${hmCsvBase}_${hmEls.param.value||"param"}_heatmap.png`;link.href=hmEls.canvas.toDataURL("image/png");link.click();}
+function hmDownloadText(name,text,type){const blob=new Blob([text],{type});const url=URL.createObjectURL(blob);const link=document.createElement("a");link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function hmIdxOf(name){return hmHeaders.findIndex(h=>h.toLowerCase()===name.toLowerCase());}
+function hmCol(cols,i){return i>=0&&i<cols.length?String(cols[i]).trim():"";}
+function hmParseNumber(value){const text=value==null?"":String(value).trim();if(!text)return null;const num=Number(text);return Number.isFinite(num)?num:null;}
+function hmClampInt(value,min,max,fallback){if(!Number.isFinite(value))return fallback;return Math.max(min,Math.min(max,Math.round(value)));}
+function hmFormatG(value,digits){if(!Number.isFinite(value))return "";return Number(value.toPrecision(digits)).toString();}
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE 3 — STRIP TEST MERGER
+// ══════════════════════════════════════════════════════════════════════════════
+const M_NEW_HEADERS=['Test Date/ Time','Report Date','Lot No.','Input','Output','Yield','VTH','VTH_%','VTH < 1.5 V','VTH < 1.5 V_%','VTH > 6 V','VTH > 6 V_%','VFSD','VFSD_%','BVDSS 2','BVDSS 2_%','BVDSS 1','BVDSS 1_%','Delta3','Delta3_%','IPD-10V','IPD-10V_%','IDSS1','IDSS1_%','IDSS2','IDSS2_%','IDSS3','IDSS3_%','pos_01','pos_02','pos_03','pos_04','pos_05','pos_06','pos_07','pos_08','pos_09','pos_10','pos_11','pos_12','pos_13','pos_14','pos_15','pos_16','pos_17','pos_18','pos_19','pos_20','pos_21','pos_22','pos_23','pos_24'];
+const M_DISPLAY_HEADERS=['Test Date/ Time','Report Date','Lot No.','Input','Output','Yield','VTH',null,'VTH < 1.5 V',null,'VTH > 6 V',null,'VFSD',null,'BVDSS 2',null,'BVDSS 1',null,'Delta3',null,'IPD-10V',null,'IDSS1',null,'IDSS2',null,'IDSS3',null,'01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24'];
+const M_MERGED_PAIRS=[[7,8],[9,10],[11,12],[13,14],[15,16],[17,18],[19,20],[21,22],[23,24],[25,26],[27,28]];
+const M_PCT_COL_INDICES=new Set([5,7,9,11,13,15,17,19,21,23,25,27,...Array.from({length:24},(_,i)=>28+i)]);
+const M_COL_WIDTHS=[14,12,24,10,10,10,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8];
+
+let mNewFiles=[],mOldFile=null,mNewData=[],mOldData=[];
+
+function mLog(msg,type='info'){
+  const box=document.getElementById('m-logBox');box.classList.add('active');
+  const p=document.createElement('p');p.className='log-line '+type;p.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(p);box.scrollTop=box.scrollHeight;
+}
+function mSetProgress(pct){document.getElementById('m-progressWrap').classList.add('active');document.getElementById('m-progressBar').style.width=pct+'%';}
+function mFormatBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB';}
+function mGetExt(name){return name.split('.').pop().toLowerCase();}
+
+function mHandleDragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('drag-over');}
+function mHandleDragLeave(e,id){document.getElementById(id).classList.remove('drag-over');}
+function mHandleDrop(e,type){e.preventDefault();document.getElementById(type==='new'?'m-newDrop':'m-oldDrop').classList.remove('drag-over');const files=Array.from(e.dataTransfer.files).filter(f=>/\.(xlsx|xls)$/i.test(f.name));if(files.length)mAddFiles(files,type);}
+function mHandleFiles(e,type){mAddFiles(Array.from(e.target.files),type);}
+
+function mAddFiles(files,type){
+  if(type==='new'){files.forEach(f=>{if(!mNewFiles.find(x=>x.name===f.name))mNewFiles.push(f);});mRenderFileList('new');mParseAllNew();}
+  else{mOldFile=files[0];mRenderFileList('old');mParseOld();}
+}
+function mRemoveFile(type,name){
+  if(type==='new'){mNewFiles=mNewFiles.filter(f=>f.name!==name);mNewData=mNewData.filter(r=>r._src!==name);}
+  else{mOldFile=null;mOldData=[];}
+  mRenderFileList(type);mUpdateStats();mCheckReady();
+}
+function mRenderFileList(type){
+  const listEl=document.getElementById(type+'FileList'.replace('FileList','m-'+type+'FileList'));
+  // correct id
+  const el2=document.getElementById('m-'+type+'FileList');
+  const files=type==='new'?mNewFiles:(mOldFile?[mOldFile]:[]);
+  el2.innerHTML='';
+  files.forEach(f=>{
+    const ext=mGetExt(f.name).toUpperCase();
+    const div=document.createElement('div');div.className='file-item';
+    div.innerHTML=`<div class="file-icon ${ext.toLowerCase()}">${ext}</div><div class="file-name" title="${f.name}">${f.name}</div><div class="file-size">${mFormatBytes(f.size)}</div><div class="file-status reading" id="mfs_${type}_${f.name.replace(/\W/g,'_')}">讀取中…</div><button class="remove-btn" onclick="mRemoveFile('${type}','${f.name}')" title="移除"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+    el2.appendChild(div);
+  });
+}
+function mSetFileStatus(type,name,ok,msg){const el=document.getElementById('mfs_'+type+'_'+name.replace(/\W/g,'_'));if(!el)return;el.className='file-status '+(ok?'ok':'err');el.textContent=ok?'✓ '+msg:'✗ '+msg;}
+
+function mDetectFormat(headerRow){const h=headerRow.map(x=>(x===null||x===undefined)?'':String(x).trim());if(h[0]==='Test Date/ Time')return'new';if(h[0]===''&&h[1]==='Date')return'old_with_blank_row0';if(h[0]==='Date')return'old';return'unknown';}
+function mExcelSerialToDate(serial){const d=new Date(Math.round((serial-25569)*86400*1000));return new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());}
+function mToJsDate(val){if(!val&&val!==0)return null;if(val instanceof Date)return isNaN(val)?null:val;if(typeof val==='number'&&val>0)return mExcelSerialToDate(val);if(typeof val==='string'&&val.trim()!==''){const d=new Date(val.trim().replace(/\//g,'-'));return isNaN(d)?null:d;}return null;}
+function mFormatDate(val){const d=mToJsDate(val);if(!d)return'';const y=d.getFullYear();const m=String(d.getMonth()+1).padStart(2,'0');const dd=String(d.getDate()).padStart(2,'0');return`${y}/${m}/${dd}`;}
+function mSortKey(row){const tdt=row['Test Date/ Time'];if(tdt&&String(tdt).trim()!==''){const s=String(tdt).trim();const m=s.match(/^(\d{4})(\d{2})(\d{2})-(\d{2}):(\d{2})(\d{2})$/);if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6]).getTime();const d=new Date(s);if(!isNaN(d))return d.getTime();}const d=mToJsDate(row['Report Date']);return d?d.getTime():0;}
+
+function mParseSheetToRows(wb,isNewFormat){
+  const sheetName=wb.SheetNames.find(s=>s.toLowerCase().includes('summary'))||wb.SheetNames[0];
+  const ws=wb.Sheets[sheetName];
+  const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:true});
+  if(!raw||raw.length<2)return[];
+  let headerRowIdx=0;let fmt=mDetectFormat(raw[0]);
+  if(fmt==='old_with_blank_row0'){headerRowIdx=1;fmt='old';}
+  if(fmt==='unknown'){fmt=mDetectFormat(raw[1]||[]);if(fmt!=='unknown')headerRowIdx=1;}
+  const headers=raw[headerRowIdx].map(h=>(h===null||h===undefined)?'':String(h).trim());
+  const dataRows=raw.slice(headerRowIdx+1);
+  if(isNewFormat||fmt==='new'){
+    return dataRows.map(row=>{
+      const r={};
+      M_NEW_HEADERS.forEach((field,ni)=>{
+        const displayH=M_DISPLAY_HEADERS[ni];let srcIdx=-1;
+        if(displayH!==null){srcIdx=headers.findIndex(h=>h===displayH||h===field);}
+        if(srcIdx===-1){const prevDisplay=M_DISPLAY_HEADERS[ni-1];if(prevDisplay){const leftIdx=headers.findIndex(h=>h===prevDisplay||h===M_NEW_HEADERS[ni-1]);if(leftIdx>=0)srcIdx=leftIdx+1;}}
+        if(srcIdx===-1)srcIdx=ni;
+        r[field]=(srcIdx>=0&&srcIdx<row.length)?row[srcIdx]:'';
+      });return r;
+    }).filter(r=>String(r['Lot No.']).trim()!=='');
+  }else{
+    const OLD_TO_NEW={'Test Date/ Time':-1,'Report Date':0,'Lot No.':1,'Input':2,'Output':3,'Yield':4,'VTH':5,'VTH_%':6,'VTH < 1.5 V':23,'VTH < 1.5 V_%':24,'VTH > 6 V':25,'VTH > 6 V_%':26,'VFSD':7,'VFSD_%':8,'BVDSS 2':9,'BVDSS 2_%':10,'BVDSS 1':11,'BVDSS 1_%':12,'Delta3':13,'Delta3_%':14,'IPD-10V':15,'IPD-10V_%':16,'IDSS1':17,'IDSS1_%':18,'IDSS2':19,'IDSS2_%':20,'IDSS3':21,'IDSS3_%':22};
+    return dataRows.map(row=>{
+      const r={};
+      M_NEW_HEADERS.forEach(field=>{if(field.startsWith('pos_')){r[field]='';return;}const oldIdx=OLD_TO_NEW[field];if(oldIdx===undefined||oldIdx===-1){r[field]='';return;}r[field]=(oldIdx<row.length)?row[oldIdx]:'';});return r;
+    }).filter(r=>String(r['Lot No.']).trim()!=='');
+  }
+}
+
+function mReadWorkbook(file,cb){const reader=new FileReader();reader.onload=e=>{try{const data=new Uint8Array(e.target.result);const wb=XLSX.read(data,{type:'array',cellDates:false});cb(null,wb);}catch(err){cb(err);}};reader.readAsArrayBuffer(file);}
+
+function mParseAllNew(){
+  mNewData=mNewData.filter(r=>mNewFiles.find(f=>f.name===r._src));
+  const pending=mNewFiles.filter(f=>!mNewData.find(r=>r._src===f.name));
+  let done=0;if(!pending.length){mUpdateStats();mCheckReady();return;}
+  pending.forEach(file=>{
+    mReadWorkbook(file,(err,wb)=>{
+      if(err){mLog(`讀取失敗: ${file.name} — ${err.message}`,'err');mSetFileStatus('new',file.name,false,'格式錯誤');}
+      else{const rows=mParseSheetToRows(wb,false);rows.forEach(r=>r._src=file.name);mNewData=[...mNewData.filter(r=>r._src!==file.name),...rows];const fmtTag=rows.length>0&&rows[0]['Test Date/ Time']!==''?'(新格式)':'(舊格式)';mLog(`已讀取 ${file.name} ${fmtTag}：${rows.length} 筆`,'ok');mSetFileStatus('new',file.name,true,rows.length+' 筆');}
+      done++;if(done===pending.length){mUpdateStats();mCheckReady();}
+    });
+  });
+}
+
+function mParseOld(){
+  if(!mOldFile)return;
+  mReadWorkbook(mOldFile,(err,wb)=>{
+    if(err){mLog(`讀取失敗: ${mOldFile.name} — ${err.message}`,'err');mSetFileStatus('old',mOldFile.name,false,'格式錯誤');mOldData=[];}
+    else{mOldData=mParseSheetToRows(wb,false);mLog(`已讀取歷史報表 ${mOldFile.name}：${mOldData.length} 筆`,'ok');mSetFileStatus('old',mOldFile.name,true,mOldData.length+' 筆');}
+    mUpdateStats();mCheckReady();
+  });
+}
+
+function mComputeDedup(){
+  const newLots=new Map();mNewData.forEach(r=>{const lot=String(r['Lot No.']).trim();newLots.set(lot,(newLots.get(lot)||0)+1);});
+  const dupMap=new Map();mOldData.forEach(r=>{const lot=String(r['Lot No.']).trim();if(newLots.has(lot)){if(!dupMap.has(lot))dupMap.set(lot,{oldCount:0,newCount:newLots.get(lot)});dupMap.get(lot).oldCount++;}});
+  return{newLots,dupMap};
+}
+
+function mUpdateStats(){
+  const nNew=mNewData.length,nOld=mOldData.length;
+  const{dupMap}=mComputeDedup();let dupRows=0;dupMap.forEach(v=>dupRows+=v.oldCount);
+  const total=nNew+nOld-dupRows;
+  document.getElementById('m-statNew').textContent=nNew.toLocaleString();
+  document.getElementById('m-statOld').textContent=nOld.toLocaleString();
+  document.getElementById('m-statDup').textContent=dupRows.toLocaleString();
+  document.getElementById('m-statTotal').textContent=total.toLocaleString();
+  document.getElementById('m-statsCard').style.display=(nNew+nOld>0)?'':'none';
+  const dedupCard=document.getElementById('m-dedupCard');
+  const tbody=document.getElementById('m-dedupTbody');
+  const countBadge=document.getElementById('m-dedupCount');
+  tbody.innerHTML='';
+  if(dupMap.size>0&&nOld>0){
+    dedupCard.style.display='';countBadge.textContent=`${dupMap.size} 個 Lot No. 重複`;
+    let idx=0;dupMap.forEach((v,lot)=>{const tr=document.createElement('tr');tr.style.background=idx%2===0?'#F5F7FA':'#fff';tr.innerHTML=`<td style="padding:7px 12px;font-weight:600;color:#1A2340;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${lot}">${lot}</td><td style="padding:7px 12px;text-align:center;color:#C00000;font-weight:600">${v.oldCount}</td><td style="padding:7px 12px;text-align:center;color:#375623;font-weight:600">${v.newCount}</td><td style="padding:7px 12px"><span style="background:#FFF2E8;color:#B85A00;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap">✕ 刪除舊資料，保留新版</span></td>`;tbody.appendChild(tr);idx++;});
+  }else{
+    dedupCard.style.display=(nNew>0&&nOld>0)?'':'none';countBadge.textContent='無重複';
+    if(nNew>0&&nOld>0){const tr=document.createElement('tr');tr.innerHTML=`<td colspan="4" style="padding:16px 12px;text-align:center;color:#6B7799;font-size:13px">✓ 無重複的 Lot No.，所有資料直接合併</td>`;tbody.appendChild(tr);}
+  }
+}
+
+function mCheckReady(){document.getElementById('m-mergeBtn').disabled=(mNewData.length===0);}
+
+async function mBuildFinalXlsxBuffer(allRows){
+  const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Summary');
+  ws.columns=M_COL_WIDTHS.map(w=>({width:w}));
+  const headerValues=M_DISPLAY_HEADERS.map(h=>h===null?'':h);
+  const headerRow=ws.addRow(headerValues);headerRow.height=24;
+  const headerStyle={font:{bold:true,color:{argb:'FFFFFFFF'},size:11,name:'Calibri'},fill:{type:'pattern',pattern:'solid',fgColor:{argb:'FF4472C4'}},alignment:{horizontal:'center',vertical:'middle',wrapText:true},border:{top:{style:'thin',color:{argb:'FF2F528F'}},bottom:{style:'thin',color:{argb:'FF2F528F'}},left:{style:'thin',color:{argb:'FF2F528F'}},right:{style:'thin',color:{argb:'FF2F528F'}}}};
+  headerRow.eachCell({includeEmpty:true},cell=>{cell.style=headerStyle;});
+  M_MERGED_PAIRS.forEach(([c1,c2])=>{ws.mergeCells(1,c1,1,c2);});
+  ws.views=[{state:'frozen',xSplit:0,ySplit:1,topLeftCell:'A2',activePane:'bottomLeft'}];
+  const zebraFill={type:'pattern',pattern:'solid',fgColor:{argb:'FFDCE6F1'}};const dataFont={size:10,name:'Calibri'};
+  allRows.forEach((row,rowIdx)=>{
+    const values=M_NEW_HEADERS.map((field,i)=>{let v=row[field];if(v===undefined||v===null)v='';if(i===1)return mFormatDate(v);return v;});
+    const exRow=ws.addRow(values);const isZebra=(rowIdx%2===0);
+    exRow.eachCell({includeEmpty:true},(cell,colNumber)=>{
+      const colIdx=colNumber-1;const style={font:dataFont};
+      if(isZebra)style.fill=zebraFill;
+      if(M_PCT_COL_INDICES.has(colIdx)){style.numFmt='0.00%';if(cell.value!==''&&cell.value!==null&&!isNaN(Number(cell.value)))cell.value=Number(cell.value);}
+      cell.style=style;
+    });
+  });
+  const buffer=await wb.xlsx.writeBuffer();return buffer;
+}
+
+function doMerge(){
+  document.getElementById('m-successBanner').classList.remove('active');
+  document.getElementById('m-logBox').innerHTML='';document.getElementById('m-logBox').classList.add('active');
+  document.getElementById('m-spinner').style.display='block';document.getElementById('m-btnIcon').style.display='none';
+  document.getElementById('m-btnText').textContent='合併中…';document.getElementById('m-mergeBtn').disabled=true;
+  mSetProgress(10);
+  setTimeout(async()=>{
+    try{
+      mLog('━━━━━━━━ 開始合併流程 ━━━━━━━━','info');mLog(`每日報表：${mNewData.length} 筆`,'info');mLog(`歷史報表：${mOldData.length} 筆`,'info');mSetProgress(20);
+      const newLotSet=new Set();mNewData.forEach(r=>newLotSet.add(String(r['Lot No.']).trim()));mLog(`每日報表中共有 ${newLotSet.size} 個不重複 Lot No.`,'info');mSetProgress(30);
+      const dupLots=new Map();
+      const filteredOld=mOldData.filter(r=>{const lot=String(r['Lot No.']).trim();if(newLotSet.has(lot)){dupLots.set(lot,(dupLots.get(lot)||0)+1);return false;}return true;});
+      if(dupLots.size===0){mLog('✓ 無重複 Lot No.，所有歷史資料直接保留','ok');}
+      else{mLog(`━━ 重複 Lot No. 過濾：共 ${dupLots.size} 個批號 ━━`,'warn');let totalRemoved=0;dupLots.forEach((cnt,lot)=>{mLog(`  ✕ 刪除舊資料 Lot No.: ${lot}（${cnt} 筆）`,'warn');totalRemoved+=cnt;});mLog(`→ 歷史報表共刪除 ${totalRemoved} 筆重複資料`,'warn');mLog(`→ 歷史報表保留 ${filteredOld.length} 筆`,'ok');}
+      mSetProgress(45);
+      const allRows=[...mNewData,...filteredOld];mLog(`━━ 合併：新資料 ${mNewData.length} 筆 + 舊資料 ${filteredOld.length} 筆 = ${allRows.length} 筆 ━━`,'ok');mSetProgress(55);
+      mLog('依時間排序（新→舊）…','info');allRows.sort((a,b)=>mSortKey(b)-mSortKey(a));mSetProgress(65);
+      mLog('建立樣式化 xlsx 工作表…','info');const buf=await mBuildFinalXlsxBuffer(allRows);mSetProgress(88);
+      const today=new Date();const ymd=today.getFullYear().toString()+String(today.getMonth()+1).padStart(2,'0')+String(today.getDate()).padStart(2,'0');const filename=`StripTest_Summary_${ymd}.xlsx`;
+      const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+      mSetProgress(100);mLog('━━━━━━━━ 完成 ━━━━━━━━','ok');mLog(`✓ 檔案已下載：${filename}（共 ${allRows.length} 筆）`,'ok');
+      document.getElementById('m-successBanner').classList.add('active');document.getElementById('m-successTitle').textContent=`${filename} 已下載`;
+      const dupSummary=dupLots.size>0?`，已去除 ${dupLots.size} 個重複批號共 ${[...dupLots.values()].reduce((a,b)=>a+b,0)} 筆舊資料`:'，無重複資料';
+      document.getElementById('m-successDesc').textContent=`共 ${allRows.length} 筆（新 ${mNewData.length} + 舊 ${filteredOld.length}${dupSummary}），已依時間由新到舊排序`;
+    }catch(err){mLog(`合併失敗: ${err.message}`,'err');console.error(err);}
+    document.getElementById('m-spinner').style.display='none';document.getElementById('m-btnIcon').style.display='';document.getElementById('m-btnText').textContent='Output — 產出 StripTest_Summary_yyyymmdd.xlsx';document.getElementById('m-mergeBtn').disabled=(mNewData.length===0);
+  },80);
+}
+</script>
+</body>
+</html>
