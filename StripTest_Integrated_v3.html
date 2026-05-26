@@ -518,11 +518,11 @@ body {
     <button class="nav-tab" data-page="page-heatmap">
       <span class="tab-num">2</span> Strip Heatmap
     </button>
-    <button class="nav-tab" data-page="page-merger">
-      <span class="tab-num">3</span> Report Merger
-    </button>
     <button class="nav-tab" data-page="page-batchhm">
-      <span class="tab-num">4</span> 批次 Heatmap
+      <span class="tab-num">3</span> Batch Heatmap
+    </button>
+    <button class="nav-tab" data-page="page-merger">
+      <span class="tab-num">4</span> Report Merger
     </button>
   </div>
 </nav>
@@ -795,8 +795,8 @@ body {
 ══════════════════════════════════════════════ -->
 <div id="page-batchhm" class="page">
   <header>
-    <h1>批次 Strip Heatmap</h1>
-    <div id="bhm-topStatus">匯入 Strip List (.txt) 及 XLS 檔案後，選擇參數，按「產生批次 Heatmap」。</div>
+    <h1>Batch Heatmap</h1>
+    <div id="bhm-topStatus">匯入 Strip List (.txt) 及 XLS 檔案後，選擇參數，按「產生 Batch Heatmap」。</div>
   </header>
   <main>
     <aside>
@@ -832,7 +832,7 @@ body {
       <section class="group">
         <h2>④ 產生</h2>
         <button class="bhm-run-btn" id="bhm-runBtn" disabled>
-          產生批次 Heatmap 並下載 ZIP
+          產生 Batch Heatmap 並下載 ZIP
         </button>
         <div class="bhm-progress-wrap" id="bhm-progressWrap">
           <div class="bhm-progress-bar" id="bhm-progressBar"></div>
@@ -843,7 +843,7 @@ body {
 
     <section class="stage">
       <div class="bhm-empty-stage" id="bhm-emptyStage">
-        載入 Strip List 及 XLS 檔案，<br>選擇測試參數後按「產生批次 Heatmap」。
+        載入 Strip List 及 XLS 檔案，<br>選擇測試參數後按「產生 Batch Heatmap」。
       </div>
       <div id="bhm-resultsWrap" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -1086,7 +1086,7 @@ function autoHmRenderToCanvas(csvText, lotName, paramCsvName){
   const maxX=allDies.length?Math.max(...allDies.map(d=>d.X)):13;
   const maxY=allDies.length?Math.max(...allDies.map(d=>d.Y)):13;
   const cellW=28,cellH=18,fontSize=6;
-  const TITLE_H=40,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
+  const TITLE_H=80,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
   const waferW=maxX*cellW,waferH=maxY*cellH;
   const totalW=MARGIN*2+COLS*waferW+(COLS-1)*WAFER_PAD_X;
   const totalH=MARGIN*2+TITLE_H+GRID_ROWS*(WAFER_LABEL_H+waferH)+(GRID_ROWS-1)*WAFER_PAD_Y;
@@ -1102,7 +1102,7 @@ function autoHmRenderToCanvas(csvText, lotName, paramCsvName){
     limitSuffix=`  [${loLimit==null?"-∞":fmtG(loLimit,4)} ~ ${hiLimit==null?"+∞":fmtG(hiLimit,4)}]`;
   }
   const title=`${lotName} ${paramCsvName} Strip Heatmap${limitSuffix}`;
-  ctx.fillStyle="#0050c8";ctx.font="700 17px Arial";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillStyle="#0050c8";ctx.font="700 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";
   ctx.fillText(title,totalW/2,TITLE_H/2);
   ctx.font="700 11px Arial";ctx.textAlign="left";ctx.textBaseline="top";
 
@@ -1541,7 +1541,7 @@ function hmRenderHeatmap(){
   const cellW=hmClampInt(Number(hmEls.cellW.value),4,80,28);
   const cellH=hmClampInt(Number(hmEls.cellH.value),4,60,18);
   const fontSize=hmClampInt(Number(hmEls.fontSize.value),4,20,6);
-  const TITLE_H=40,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
+  const TITLE_H=80,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
   const allDies=[...hmWafers.values()].flat();
   const maxX=allDies.length?Math.max(...allDies.map(d=>d.X)):13;
   const maxY=allDies.length?Math.max(...allDies.map(d=>d.Y)):13;
@@ -1553,7 +1553,7 @@ function hmRenderHeatmap(){
   let limitSuffix="";
   if(loLimit!=null||hiLimit!=null){limitSuffix=`  [${loLimit==null?"-∞":hmFormatG(loLimit,4)} ~ ${hiLimit==null?"+∞":hmFormatG(hiLimit,4)}]`;}
   const title=`${hmCsvBase} ${paramName} Strip Heatmap${limitSuffix}`;
-  ctx.fillStyle=HM_COLOR_TITLE_FG;ctx.font="700 17px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(title,totalW/2,TITLE_H/2);
+  ctx.fillStyle=HM_COLOR_TITLE_FG;ctx.font="700 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(title,totalW/2,TITLE_H/2);
   ctx.font="700 11px Arial";ctx.textAlign="left";ctx.textBaseline="top";
   for(let gridCol=0;gridCol<COLS;gridCol++){
     for(let gridRow=0;gridRow<GRID_ROWS;gridRow++){
@@ -1859,7 +1859,7 @@ function doMerge(){
   $('bhm-xlsFiles').addEventListener('change', e=>{
     const files = Array.from(e.target.files||[]).filter(f=>/\.xls$/i.test(f.name));
     bhmXlsMap = new Map();
-    files.forEach(f=>bhmXlsMap.set(f.name.toLowerCase().trim(), f));
+    files.forEach(f=>bhmXlsMap.set(f.name.replace(/\.xls$/i,'').toLowerCase().trim(), f));
     $('bhm-xlsStatus').textContent = `資料夾內找到 ${files.length} 個 .xls 檔案。`;
     renderFileList();
     checkReady();
@@ -2013,7 +2013,7 @@ function doMerge(){
       console.error(err);
     }finally{
       $('bhm-runBtn').disabled = false;
-      $('bhm-runBtn').textContent = '產生批次 Heatmap 並下載 ZIP';
+      $('bhm-runBtn').textContent = '產生 Batch Heatmap 並下載 ZIP';
       setTimeout(()=>showProgress(false), 700);
     }
   });
@@ -2063,7 +2063,7 @@ function doMerge(){
     const maxX = allDies.length ? Math.max(...allDies.map(d=>d.X)) : 13;
     const maxY = allDies.length ? Math.max(...allDies.map(d=>d.Y)) : 13;
     const cellW=28, cellH=18, fontSize=6;
-    const TITLE_H=40, WAFER_LABEL_H=18, WAFER_PAD_X=10, WAFER_PAD_Y=14, MARGIN=20, COLS=4, GRID_ROWS=6;
+    const TITLE_H=80, WAFER_LABEL_H=18, WAFER_PAD_X=10, WAFER_PAD_Y=14, MARGIN=20, COLS=4, GRID_ROWS=6;
     const waferW=maxX*cellW, waferH=maxY*cellH;
     const totalW=MARGIN*2+COLS*waferW+(COLS-1)*WAFER_PAD_X;
     const totalH=MARGIN*2+TITLE_H+GRID_ROWS*(WAFER_LABEL_H+waferH)+(GRID_ROWS-1)*WAFER_PAD_Y;
@@ -2078,7 +2078,7 @@ function doMerge(){
     if(loLimit!=null||hiLimit!=null)
       limitSuffix=`  [${loLimit==null?'-∞':fmtG(loLimit,4)} ~ ${hiLimit==null?'+∞':fmtG(hiLimit,4)}]`;
 
-    ctx.fillStyle='#0050c8'; ctx.font='700 17px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#0050c8'; ctx.font='700 34px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(`${lotName} ${paramCsv} Strip Heatmap${limitSuffix}`, totalW/2, TITLE_H/2);
     ctx.font='700 11px Arial'; ctx.textAlign='left'; ctx.textBaseline='top';
 
