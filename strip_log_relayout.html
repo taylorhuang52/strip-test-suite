@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XLS 列刪除工具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px 24px;
+  }
+
+  h1 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #f8fafc;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 0.82rem;
+    color: #64748b;
+    margin-bottom: 28px;
+  }
+
+  .rule-box {
+    background: #1e2130;
+    border: 1px solid #2d3452;
+    border-left: 3px solid #6366f1;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: #94a3b8;
+    margin-bottom: 24px;
+    line-height: 1.7;
+  }
+  .rule-box strong { color: #a5b4fc; }
+
+  .zones {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .drop-zone {
+    border: 2px dashed #2d3452;
+    border-radius: 12px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: #141720;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: #6366f1;
+    background: #1a1d2e;
+  }
+  .drop-zone input { display: none; }
+
+  .zone-icon { font-size: 2rem; margin-bottom: 8px; }
+  .zone-title { font-size: 0.9rem; font-weight: 600; color: #c7d2fe; margin-bottom: 4px; }
+  .zone-sub { font-size: 0.75rem; color: #475569; }
+
+  .file-list {
+    background: #141720;
+    border: 1px solid #1e2538;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    display: none;
+  }
+  .file-list-header {
+    padding: 10px 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #475569;
+    background: #0f1117;
+    border-bottom: 1px solid #1e2538;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .file-items-wrap { max-height: 320px; overflow-y: auto; }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid #1a1f30;
+    font-size: 0.82rem;
+  }
+  .file-item:last-child { border-bottom: none; }
+  .file-name { flex: 1; color: #cbd5e1; font-family: monospace; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { color: #475569; font-size: 0.75rem; min-width: 60px; text-align: right; }
+  .file-status {
+    min-width: 90px;
+    text-align: right;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .status-pending   { color: #475569; }
+  .status-processing{ color: #f59e0b; }
+  .status-removed   { color: #22c55e; }
+  .status-skipped   { color: #6366f1; }
+  .status-error     { color: #ef4444; }
+  .status-nosheet   { color: #f97316; }
+
+  .btn-run {
+    background: #6366f1;
+    color: #fff;
+    border: none;
+    padding: 12px 28px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, opacity 0.2s;
+    display: block;
+    width: 100%;
+    margin-bottom: 20px;
+  }
+  .btn-run:hover:not(:disabled) { background: #4f46e5; }
+  .btn-run:disabled { opacity: 0.4; cursor: default; }
+
+  .summary {
+    display: none;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: #141720;
+    border: 1px solid #1e2538;
+    border-radius: 10px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .stat-num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+  .stat-label { font-size: 0.7rem; color: #475569; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-total   .stat-num { color: #e2e8f0; }
+  .stat-removed .stat-num { color: #22c55e; }
+  .stat-skipped .stat-num { color: #6366f1; }
+  .stat-error   .stat-num { color: #ef4444; }
+
+  .log {
+    background: #0a0c13;
+    border: 1px solid #1a1f2e;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: monospace;
+    font-size: 0.75rem;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+    color: #64748b;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .log .ok   { color: #22c55e; }
+  .log .skip { color: #818cf8; }
+  .log .warn { color: #f97316; }
+  .log .err  { color: #ef4444; }
+  .log .info { color: #94a3b8; }
+
+  .clear-btn {
+    background: none;
+    border: 1px solid #2d3452;
+    color: #64748b;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 0.7rem;
+    cursor: pointer;
+  }
+  .clear-btn:hover { border-color: #6366f1; color: #a5b4fc; }
+
+  .download-bar {
+    display: none;
+    background: #0d1f12;
+    border: 1px solid #166534;
+    border-radius: 10px;
+    padding: 16px 20px;
+    align-items: center;
+    gap: 14px;
+  }
+  .download-bar .dl-icon { font-size: 1.5rem; }
+  .download-bar .dl-text { flex: 1; font-size: 0.85rem; color: #86efac; }
+  .download-bar .dl-sub  { font-size: 0.72rem; color: #4ade80; margin-top: 2px; }
+  .btn-dl {
+    background: #16a34a;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-dl:hover { background: #15803d; }
+</style>
+</head>
+<body>
+
+<h1>XLS 列刪除工具</h1>
+<p class="subtitle">批次處理 XLS 檔案 — 自動移除 LoggerData 分頁第 4 列（若 A4 = "Time"），並刪除超出 Q 欄的多餘測試項欄</p>
+
+<div class="rule-box">
+  <strong>處理規則：</strong>
+  掃描每個 <code>.xls</code> 檔案，找到 <strong>LoggerData</strong> 分頁，執行以下兩項處理：<br>
+  ① 若第 4 列第 1 欄（A4）的值為 <strong>"Time"</strong>（不區分大小寫），則刪除該整列。<br>
+  ② 找到 <strong>Serial</strong> 標頭列，若 Remark 欄（最後一欄）不在 R 欄，代表測試項超出 Q 欄，
+  將 R 欄以後的多餘測試項欄全部刪除，並保留 Remark 整欄。<br>
+  所有修改後的檔案打包成 <strong>一個 ZIP</strong> 一次下載，不需修改的檔案不包含在內。
+</div>
+
+<div class="zones">
+  <div class="drop-zone" id="fileZone" onclick="document.getElementById('fileInput').click()"
+       ondragover="onDrag(event,'fileZone')" ondragleave="offDrag('fileZone')" ondrop="onDropFiles(event)">
+    <input type="file" id="fileInput" multiple accept=".xls" onchange="addFiles(this.files)">
+    <div class="zone-icon">📄</div>
+    <div class="zone-title">選取 XLS 檔案</div>
+    <div class="zone-sub">點擊或拖放 .xls 檔案（可多選）</div>
+  </div>
+
+  <div class="drop-zone" id="folderZone" onclick="document.getElementById('folderInput').click()"
+       ondragover="onDrag(event,'folderZone')" ondragleave="offDrag('folderZone')" ondrop="onDropFolder(event)">
+    <input type="file" id="folderInput" webkitdirectory accept=".xls" onchange="addFiles(this.files)">
+    <div class="zone-icon">📁</div>
+    <div class="zone-title">選取資料夾</div>
+    <div class="zone-sub">點擊選整個資料夾，自動篩選 .xls</div>
+  </div>
+</div>
+
+<div class="file-list" id="fileList">
+  <div class="file-list-header">
+    <span id="fileCount">0 個檔案</span>
+    <button class="clear-btn" onclick="clearFiles()">清除全部</button>
+  </div>
+  <div class="file-items-wrap">
+    <div id="fileItems"></div>
+  </div>
+</div>
+
+<button class="btn-run" id="runBtn" disabled onclick="processAll()">▶ 開始處理</button>
+
+<div class="summary" id="summary">
+  <div class="stat stat-total">  <div class="stat-num" id="sTotal">0</div>  <div class="stat-label">總計</div></div>
+  <div class="stat stat-removed"><div class="stat-num" id="sRemoved">0</div><div class="stat-label">已修改</div></div>
+  <div class="stat stat-skipped"><div class="stat-num" id="sSkipped">0</div><div class="stat-label">略過</div></div>
+  <div class="stat stat-error">  <div class="stat-num" id="sError">0</div>  <div class="stat-label">錯誤</div></div>
+</div>
+
+<div class="log" id="log"></div>
+
+<div class="download-bar" id="downloadBar">
+  <div class="dl-icon">📦</div>
+  <div>
+    <div class="dl-text" id="dlText">處理完成，點擊下載</div>
+    <div class="dl-sub" id="dlSub"></div>
+  </div>
+  <button class="btn-dl" id="dlBtn" onclick="triggerDownload()">⬇ 下載 ZIP</button>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const files   = new Map();   // key → File
+const fileIds = new Map();   // key → dom-id
+let idCounter = 0;
+let pendingBlob = null;
+let pendingFilename = '';
+
+// ─── Drag helpers ─────────────────────────────────────────────────────────────
+function onDrag(e, z) { e.preventDefault(); document.getElementById(z).classList.add('drag-over'); }
+function offDrag(z)   { document.getElementById(z).classList.remove('drag-over'); }
+
+function onDropFiles(e) {
+  e.preventDefault(); offDrag('fileZone');
+  addFiles([...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.xls')));
+}
+function onDropFolder(e) {
+  e.preventDefault(); offDrag('folderZone');
+  addFiles([...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.xls')));
+}
+
+// ─── Add / clear files ───────────────────────────────────────────────────────
+function addFiles(list) {
+  [...list].forEach(f => {
+    if (!f.name.toLowerCase().endsWith('.xls')) return;
+    const key = f.webkitRelativePath || f.name;
+    if (!files.has(key)) {
+      files.set(key, f);
+      const id = 'fi' + (idCounter++);
+      fileIds.set(key, id);
+      appendItem(id, f.name, f.size);
+    }
+  });
+  refreshUI();
+}
+
+function appendItem(id, name, size) {
+  const d = document.createElement('div');
+  d.className = 'file-item';
+  d.id = id;
+  d.innerHTML = `<span class="file-name" title="${name}">${name}</span>
+    <span class="file-size">${fmtSize(size)}</span>
+    <span class="file-status status-pending" id="${id}-s">等待中</span>`;
+  document.getElementById('fileItems').appendChild(d);
+}
+
+function clearFiles() {
+  files.clear(); fileIds.clear();
+  document.getElementById('fileItems').innerHTML = '';
+  document.getElementById('summary').style.display  = 'none';
+  document.getElementById('log').style.display      = 'none';
+  document.getElementById('log').innerHTML          = '';
+  document.getElementById('downloadBar').style.display = 'none';
+  pendingBlob = null;
+  refreshUI();
+}
+
+function refreshUI() {
+  const n = files.size;
+  document.getElementById('fileCount').textContent = `${n} 個檔案`;
+  document.getElementById('fileList').style.display = n ? 'block' : 'none';
+  document.getElementById('runBtn').disabled = !n;
+}
+
+// ─── Main process ─────────────────────────────────────────────────────────────
+async function processAll() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = '處理中...';
+
+  document.getElementById('downloadBar').style.display = 'none';
+  pendingBlob = null;
+
+  const logEl = document.getElementById('log');
+  logEl.innerHTML = ''; logEl.style.display = 'block';
+
+  let total = 0, removed = 0, skipped = 0, errors = 0;
+  const zip = new JSZip();
+
+  for (const [key, file] of files.entries()) {
+    const domId = fileIds.get(key);
+    setStatus(domId, 'processing', '處理中…');
+    total++;
+    // yield to UI
+    await new Promise(r => setTimeout(r, 0));
+
+    try {
+      const result = await processFile(file);
+      if (result.type === 'removed') {
+        removed++;
+        setStatus(domId, 'removed', '✓ 已修改');
+        log(logEl, 'ok', `✓ ${file.name} — ${result.desc}`);
+        zip.file(file.name, result.data);
+      } else if (result.type === 'skipped') {
+        skipped++;
+        setStatus(domId, 'skipped', '→ 略過');
+        log(logEl, 'skip', `→ ${file.name} — ${result.reason}`);
+      } else if (result.type === 'nosheet') {
+        skipped++;
+        setStatus(domId, 'nosheet', '無分頁');
+        log(logEl, 'warn', `⚠ ${file.name} — 找不到 LoggerData 分頁`);
+      }
+    } catch (e) {
+      errors++;
+      setStatus(domId, 'error', '✗ 錯誤');
+      log(logEl, 'err', `✗ ${file.name} — ${e.message}`);
+    }
+  }
+
+  // Update summary
+  document.getElementById('sTotal').textContent   = total;
+  document.getElementById('sRemoved').textContent = removed;
+  document.getElementById('sSkipped').textContent = skipped;
+  document.getElementById('sError').textContent   = errors;
+  document.getElementById('summary').style.display = 'grid';
+
+  log(logEl, 'info', `── 完成：共 ${total} 個，已修改 ${removed}，略過 ${skipped}，錯誤 ${errors} ──`);
+
+  // Prepare ZIP download
+  if (removed > 0) {
+    log(logEl, 'info', '正在打包 ZIP...');
+    const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    pendingFilename = `xls_processed_${ts}.zip`;
+    pendingBlob = await zip.generateAsync({ type: 'blob' });
+
+    document.getElementById('dlText').textContent = `已修改 ${removed} 個檔案，點擊下載`;
+    document.getElementById('dlSub').textContent  = `${pendingFilename}（${fmtSize(pendingBlob.size)}）`;
+    document.getElementById('downloadBar').style.display = 'flex';
+  } else {
+    log(logEl, 'info', '沒有需要修改的檔案，不產生下載。');
+  }
+
+  btn.textContent = '▶ 再次執行'; btn.disabled = false;
+}
+
+function triggerDownload() {
+  if (!pendingBlob) return;
+  const url = URL.createObjectURL(pendingBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = pendingFilename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+// ─── Core logic ───────────────────────────────────────────────────────────────
+function processFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb   = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
+
+        const sheetName = wb.SheetNames.find(
+          s => s.trim().toLowerCase() === 'loggerdata'
+        );
+        if (!sheetName) return resolve({ type: 'nosheet' });
+
+        const ws = wb.Sheets[sheetName];
+
+        // Check A4 (row index 3 in 0-based = row 4 in 1-based)
+        const a4Cell = ws['A4'];
+        const cellVal = a4Cell ? String(a4Cell.v ?? '').trim() : '';
+
+        let rowDeleted = false;
+        let colDeleted = false;
+        let colDeleteCount = 0;
+
+        // Rule 1: Delete row 4 if A4 starts with "Time" (case-insensitive)
+        if (cellVal.toLowerCase() === 'time') {
+          deleteRow(ws, 4);  // 1-based
+          rowDeleted = true;
+        }
+
+        // Rule 2: Find the "Serial" header row to locate the Remark column.
+        // After potential row deletion, scan for the row where A = "Serial".
+        // The last column of that row is the Remark column.
+        // Column Q (col 17, 1-based) is the expected last test-item column.
+        // If Remark is beyond col 18 (R), extra test-item columns exist and must be removed.
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        const Q_COL = 17; // Q = column 17 (1-based)
+        const REMARK_EXPECTED_COL = 18; // R = column 18 (1-based)
+
+        let serialRow = -1;
+        for (let r = range.s.r; r <= range.e.r; r++) {
+          const cellA = ws[XLSX.utils.encode_cell({ r, c: 0 })];
+          if (cellA && String(cellA.v ?? '').trim().toLowerCase() === 'serial') {
+            serialRow = r; // 0-based
+            break;
+          }
+        }
+
+        if (serialRow >= 0) {
+          // Find the actual last non-empty column in the Serial row
+          let lastCol = Q_COL; // 1-based, default Q
+          for (let c = range.e.c; c >= Q_COL; c--) {
+            const cell = ws[XLSX.utils.encode_cell({ r: serialRow, c })];
+            if (cell && cell.v !== undefined && cell.v !== null && cell.v !== '') {
+              lastCol = c + 1; // convert to 1-based
+              break;
+            }
+          }
+
+          // If Remark column is beyond col 18 (R), we have extra test-item columns
+          // We need to delete columns from col 18 (R) up to lastCol-1 (exclusive of Remark)
+          // i.e., delete (lastCol - REMARK_EXPECTED_COL) columns starting at col 18
+          if (lastCol > REMARK_EXPECTED_COL) {
+            const extraCols = lastCol - REMARK_EXPECTED_COL;
+            // Delete from the right side going left to avoid index shifting
+            for (let i = 0; i < extraCols; i++) {
+              deleteColumn(ws, REMARK_EXPECTED_COL); // always delete col 18 (R), shifting Remark left
+            }
+            colDeleted = true;
+            colDeleteCount = extraCols;
+          }
+        }
+
+        if (!rowDeleted && !colDeleted) {
+          return resolve({ type: 'skipped', reason: `A4 = "${cellVal}"，不是 "Time"，且測試項結束於 Q 欄，無需修改` });
+        }
+
+        const out = XLSX.write(wb, { type: 'array', bookType: 'xls' });
+        const desc = [
+          rowDeleted ? '刪除第 4 列(Time)' : '',
+          colDeleted ? `刪除 ${colDeleteCount} 個多餘測試欄(R~)` : ''
+        ].filter(Boolean).join('、');
+        resolve({ type: 'removed', data: out, desc });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = () => reject(new Error('讀取失敗'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function deleteRow(ws, rowNum) {
+  // rowNum is 1-based
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  const delIdx = rowNum - 1;  // 0-based row index to delete
+
+  // 1. Clear the target row
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    delete ws[XLSX.utils.encode_cell({ r: delIdx, c })];
+  }
+
+  // 2. Shift all rows below up by 1
+  for (let r = delIdx + 1; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const src = XLSX.utils.encode_cell({ r, c });
+      const dst = XLSX.utils.encode_cell({ r: r - 1, c });
+      if (ws[src]) { ws[dst] = ws[src]; delete ws[src]; }
+      else         { delete ws[dst]; }
+    }
+  }
+
+  // 3. Shift row metadata
+  if (ws['!rows']) ws['!rows'].splice(delIdx, 1);
+
+  // 4. Shrink the range
+  range.e.r = Math.max(range.s.r, range.e.r - 1);
+  ws['!ref'] = XLSX.utils.encode_range(range);
+
+  // 5. Fix merged cells
+  if (ws['!merges']) {
+    ws['!merges'] = ws['!merges']
+      .filter(m => !(m.s.r <= delIdx && delIdx <= m.e.r && m.s.r === m.e.r))
+      .map(m => {
+        if (m.s.r > delIdx) { m.s.r--; m.e.r--; }
+        else if (m.e.r > delIdx) { m.e.r--; }
+        return m;
+      });
+  }
+}
+
+function deleteColumn(ws, colNum) {
+  // colNum is 1-based
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  const delIdx = colNum - 1;  // 0-based col index to delete
+
+  // 1. Clear the target column
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    delete ws[XLSX.utils.encode_cell({ r, c: delIdx })];
+  }
+
+  // 2. Shift all columns to the right, left by 1
+  for (let c = delIdx + 1; c <= range.e.c; c++) {
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const src = XLSX.utils.encode_cell({ r, c });
+      const dst = XLSX.utils.encode_cell({ r, c: c - 1 });
+      if (ws[src]) { ws[dst] = ws[src]; delete ws[src]; }
+      else         { delete ws[dst]; }
+    }
+  }
+
+  // 3. Shift col metadata
+  if (ws['!cols']) ws['!cols'].splice(delIdx, 1);
+
+  // 4. Shrink the range
+  range.e.c = Math.max(range.s.c, range.e.c - 1);
+  ws['!ref'] = XLSX.utils.encode_range(range);
+
+  // 5. Fix merged cells
+  if (ws['!merges']) {
+    ws['!merges'] = ws['!merges']
+      .filter(m => !(m.s.c <= delIdx && delIdx <= m.e.c && m.s.c === m.e.c))
+      .map(m => {
+        if (m.s.c > delIdx) { m.s.c--; m.e.c--; }
+        else if (m.e.c > delIdx) { m.e.c--; }
+        return m;
+      });
+  }
+}
+function setStatus(id, cls, text) {
+  const el = document.getElementById(`${id}-s`);
+  if (!el) return;
+  el.className = `file-status status-${cls}`;
+  el.textContent = text;
+}
+
+function log(el, cls, msg) {
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+</script>
+</body>
+</html>
