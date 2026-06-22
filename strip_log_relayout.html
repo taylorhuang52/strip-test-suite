@@ -261,6 +261,10 @@
   <div class="stat stat-error">  <div class="stat-num" id="sError">0</div>  <div class="stat-label">錯誤</div></div>
 </div>
 
+<div class="log-header" id="logHeader" style="display:none; justify-content:space-between; align-items:center; margin-bottom:8px;">
+  <span style="font-size:0.75rem; color:#475569; text-transform:uppercase; letter-spacing:0.06em;">處理紀錄</span>
+  <button class="clear-btn" id="logDlBtn" onclick="downloadLog()">📝 輸出 Log</button>
+</div>
 <div class="log" id="log"></div>
 
 <div class="download-bar" id="downloadBar">
@@ -324,6 +328,7 @@ function clearFiles() {
   document.getElementById('summary').style.display  = 'none';
   document.getElementById('log').style.display      = 'none';
   document.getElementById('log').innerHTML          = '';
+  document.getElementById('logHeader').style.display = 'none';
   document.getElementById('downloadBar').style.display = 'none';
   pendingBlob = null;
   refreshUI();
@@ -346,6 +351,7 @@ async function processAll() {
 
   const logEl = document.getElementById('log');
   logEl.innerHTML = ''; logEl.style.display = 'block';
+  document.getElementById('logHeader').style.display = 'flex';
 
   let total = 0, removed = 0, skipped = 0, errors = 0;
   const zip = new JSZip();
@@ -404,6 +410,24 @@ async function processAll() {
   }
 
   btn.textContent = '▶ 再次執行'; btn.disabled = false;
+}
+
+function downloadLog() {
+  const logEl = document.getElementById('log');
+  const lines = [...logEl.children].map(d => d.textContent);
+  if (lines.length === 0) return;
+  const text = lines.join('\n') + '\n';
+
+  const now = new Date();
+  const mm  = String(now.getMonth() + 1).padStart(2, '0');
+  const dd  = String(now.getDate()).padStart(2, '0');
+  const filename = `log_formalized_${mm}${dd}.txt`;
+
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
 function triggerDownload() {
