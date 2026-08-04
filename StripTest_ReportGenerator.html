@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strip Test Report Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/lucide@latest" onerror="window.lucide={createIcons:function(){}}"></script>
+<style>
+/* ══════════════════════════════════════════════════
+   GLOBAL / NAV
+══════════════════════════════════════════════════ */
+:root {
+  --stp-bg: #12141c;
+  --stp-panel: #1a1e2a;
+  --stp-accent: #4682d2;
+  --stp-text: #d7dceb;
+  --stp-ok: #3cbe82;
+  --stp-border: #37415a;
+  --stp-warn: #e8a020;
+  --stp-nav-h: 52px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+#page-strip {
+  font-family: "Segoe UI", "Microsoft JhengHei", sans-serif;
+  background: var(--stp-bg);
+  color: var(--stp-text);
+  min-height: calc(100vh - 52px);
+}
+
+/* ── Tab Nav ── */
+.stp-nav-bar {
+  position: sticky; top: 52px; z-index: 90;
+  display: flex; align-items: stretch;
+  height: var(--stp-nav-h);
+  background: #0e1018;
+  border-bottom: 2px solid var(--stp-border);
+  user-select: none;
+}
+.stp-nav-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 20px;
+  font-weight: 800; font-size: 15px;
+  color: var(--stp-accent);
+  letter-spacing: .5px;
+  border-right: 1px solid var(--stp-border);
+  white-space: nowrap;
+}
+.stp-nav-logo svg { width: 22px; height: 22px; }
+.stp-nav-tabs { display: flex; }
+.stp-nav-tab {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 22px;
+  font-size: 13.5px; font-weight: 600;
+  color: #6a7898;
+  cursor: pointer;
+  border: none; background: none;
+  border-bottom: 3px solid transparent;
+  transition: color .18s, border-color .18s, background .18s;
+  position: relative; top: 2px;
+}
+.stp-nav-tab:hover { color: var(--stp-text); background: rgba(70,130,210,.06); }
+.stp-nav-tab.active { color: var(--stp-accent); border-bottom-color: var(--stp-accent); }
+.stp-nav-tab .tab-num {
+  font-size: 10px; font-weight: 800;
+  background: var(--stp-border);
+  color: var(--stp-text);
+  border-radius: 20px;
+  padding: 1px 7px;
+  letter-spacing: .3px;
+}
+.stp-nav-tab.active .tab-num { background: var(--stp-accent); color: #fff; }
+
+/* ── Pages ── */
+.stp-page { display: none !important; }
+.stp-page.active, .stp-page.stp-active { display: block !important; }
+
+/* ══════════════════════════════════════════════════
+   PAGE 1 — STRIP TEST REPORT GENERATOR
+══════════════════════════════════════════════════ */
+#stp-page-report {
+  padding: 24px 20px;
+}
+#stp-page-report .container { max-width: 1100px; margin: 0 auto; }
+#stp-page-report h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: .5px; }
+#stp-page-report .subtitle { margin-bottom: 14px; color: var(--stp-accent); font-weight: bold; font-size: 13px; }
+
+.drop-zone-r {
+  border: 3px dashed var(--stp-border);
+  background: var(--stp-panel);
+  padding: 36px;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color .2s, background .2s;
+  color: #ffffff; /* 設定為白色字體 */
+}
+.drop-zone-r.active { border-color: var(--stp-accent); background: #23293a; }
+.drop-zone-r svg { width: 40px; height: 40px; margin-bottom: 10px; color: var(--stp-accent); }
+
+.controls { margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap; }
+.stp-btn {
+  background: var(--stp-accent); color: white; border: none;
+  padding: 11px 22px; border-radius: 6px; cursor: pointer;
+  font-weight: bold; display: flex; align-items: center; gap: 8px;
+  font-size: 14px; transition: opacity .2s;
+}
+.stp-btn:disabled { background: #444; opacity: 0.45; cursor: not-allowed; }
+.btn.green { background: var(--stp-ok); }
+.log-area {
+  background: #000; color: #adffad; padding: 14px; border-radius: 6px;
+  height: 220px; overflow-y: auto; font-family: 'Consolas', monospace;
+  font-size: 12px; border: 1px solid var(--stp-border);
+}
+
+/* Heatmap modal (page 1) */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000; overflow: auto; padding: 20px; }
+.modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+.modal-box {
+  background: #1a1e2a; border: 1px solid var(--stp-border); border-radius: 12px;
+  padding: 24px; min-width: 860px; max-width: 1200px; width: 100%; position: relative;
+}
+.modal-box h3 { margin: 0 0 16px; color: var(--stp-accent); font-size: 16px; }
+.modal-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--stp-text); cursor: pointer; font-size: 22px; line-height: 1; opacity: .7; }
+.modal-close:hover { opacity: 1; }
+.heatmap-wrap { overflow-x: auto; }
+.heatmap-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; min-width: 780px; }
+.heatmap-cell { border-radius: 4px; padding: 5px 3px; text-align: center; font-size: 10px; line-height: 1.3; cursor: default; transition: transform .1s; }
+.heatmap-cell:hover { transform: scale(1.06); z-index: 2; position: relative; }
+.heatmap-cell .slot-id { font-weight: 700; font-size: 11px; display: block; }
+.heatmap-cell .slot-val { display: block; }
+.heatmap-empty { background: #2a2f3f; color: #555; }
+.heatmap-legend { display: flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 12px; }
+.legend-bar { height: 14px; width: 220px; border-radius: 3px; background: linear-gradient(to right, #c0392b, #e67e22, #f1c40f, #2ecc71, #27ae60); }
+.legend-label { color: #aaa; }
+
+/* ══════════════════════════════════════════════════
+   PAGE 2 — STRIP HEATMAP (light theme)
+══════════════════════════════════════════════════ */
+#stp-page-heatmap {
+  background: #f4f5f7;
+  color: #202428;
+  min-height: calc(100vh - var(--stp-nav-h));
+  font-size: 14px;
+}
+#stp-page-heatmap * { box-sizing: border-box; }
+#stp-page-heatmap [hidden] { display: none !important; }
+
+#stp-page-heatmap header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 18px;
+  border-bottom: 1px solid #d5d9df; background: #fff;
+}
+#stp-page-heatmap h1 { margin: 0; font-size: 18px; font-weight: 650; color: #202428; }
+#hm-topStatus { min-height: 20px; color: #66707a; line-height: 1.45; }
+
+#stp-page-heatmap main {
+  display: grid;
+  grid-template-columns: 360px minmax(0,1fr);
+  min-height: calc(100vh - var(--stp-nav-h) - 57px);
+}
+#stp-page-heatmap aside {
+  padding: 14px; border-right: 1px solid #d5d9df;
+  background: #fbfbfc; overflow: auto;
+}
+#stp-page-heatmap .stage { min-width: 0; padding: 14px; overflow: auto; }
+
+#stp-page-heatmap .group {
+  margin-bottom: 12px; padding: 12px;
+  border: 1px solid #d2d7dd; border-radius: 8px; background: #fff;
+}
+#stp-page-heatmap .group h2 { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #313840; }
+#stp-page-heatmap label { display: block; margin: 9px 0 5px; color: #66707a; font-size: 12px; }
+#stp-page-heatmap input[type="text"],
+#stp-page-heatmap input[type="number"],
+#stp-page-heatmap select {
+  width: 100%; height: 34px; padding: 6px 8px;
+  border: 1px solid #b8c0c8; border-radius: 6px;
+  background: #fff; color: #202428; font: inherit;
+}
+#stp-page-heatmap input[type="file"] { width: 100%; font-size: 13px; }
+#stp-page-heatmap .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 4px; }
+#stp-page-heatmap .check-row { display: flex; flex-direction: column; gap: 6px; }
+#stp-page-heatmap .check-row label { display: flex; gap: 7px; align-items: center; margin: 0; color: #2d343b; font-size: 13px; font-weight: 600; }
+#stp-page-heatmap .check-row input[type="number"] { width: 100%; height: 34px; }
+#stp-page-heatmap .row + .row { margin-top: 10px; }
+#stp-page-heatmap .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+#stp-page-heatmap button {
+  height: 34px; padding: 0 12px; border: 1px solid #aeb7c0;
+  border-radius: 6px; background: #fff; color: #202428; font: inherit; cursor: pointer;
+}
+#stp-page-heatmap button.primary { border-color: #1167a8; background: #1167a8; color: #fff; }
+#stp-page-heatmap button.good { border-color: #157349; background: #157349; color: #fff; }
+#stp-page-heatmap button:disabled { opacity: .5; cursor: default; }
+#stp-page-heatmap .status { min-height: 20px; color: #66707a; line-height: 1.45; }
+#stp-page-heatmap .error { color: #a13b2f; }
+#stp-page-heatmap .legend { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6px 10px; }
+#stp-page-heatmap .swatch { display: flex; align-items: center; gap: 6px; min-width: 0; color: #35404a; font-size: 12px; }
+#stp-page-heatmap .swatch i { display: inline-block; width: 16px; height: 14px; border: 1px solid #b8c0c8; flex: 0 0 auto; }
+.canvas-shell { display: inline-block; min-width: 620px; min-height: 380px; padding: 12px; border: 1px solid #d2d7dd; border-radius: 8px; background: #eef1f3; }
+#hm-canvas { display: block; background: #fff; }
+.hm-empty { display: grid; place-items: center; min-height: 320px; color: #66707a; border: 1px dashed #b8c0c8; border-radius: 8px; background: #fff; }
+#stp-page-heatmap .report { margin-top: 12px; border: 1px solid #d2d7dd; border-radius: 8px; background: #fff; overflow: hidden; }
+#stp-page-heatmap .report-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #d2d7dd; background: #fafbfc; }
+#stp-page-heatmap .report-head h2 { margin: 0; font-size: 13px; }
+#stp-page-heatmap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#stp-page-heatmap th, #stp-page-heatmap td { padding: 7px 9px; border-bottom: 1px solid #edf0f2; text-align: right; white-space: nowrap; }
+#stp-page-heatmap th:first-child, #stp-page-heatmap td:first-child { text-align: left; }
+#stp-page-heatmap th { color: #4d5963; background: #fff; }
+#stp-page-heatmap .yield-good { color: #147443; font-weight: 700; }
+#stp-page-heatmap .yield-warn { color: #926c00; font-weight: 700; }
+#stp-page-heatmap .yield-bad  { color: #a13b2f; font-weight: 700; }
+
+/* ══════════════════════════════════════════════════
+   PAGE 3 — STRIP TEST MERGER (light theme)
+══════════════════════════════════════════════════ */
+#stp-page-merger {
+  background: #F5F7FA;
+  color: #1A2340;
+  min-height: calc(100vh - var(--stp-nav-h));
+  padding: 32px 16px 64px;
+  font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+}
+#stp-page-merger * { box-sizing: border-box; }
+
+.merger-app { max-width: 820px; margin: 0 auto; }
+
+.merger-header {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 36px;
+}
+.merger-logo {
+  width: 46px; height: 46px; background: #4472C4; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+}
+.merger-logo svg { width: 26px; height: 26px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.merger-h1 { font-size: 22px; font-weight: 700; color: #2F528F; letter-spacing: -0.3px; }
+.merger-h1 span { color: #ED7D31; }
+.merger-subtitle { font-size: 13px; color: #6B7799; margin-top: 2px; }
+
+.stp-card {
+  background: #fff; border: 1px solid #D9E1EF;
+  border-radius: 10px; box-shadow: 0 2px 12px rgba(68,114,196,.10);
+  padding: 24px 28px; margin-bottom: 20px;
+}
+.stp-card-title {
+  font-size: 13px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; color: #4472C4; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.stp-card-title .tag {
+  font-size: 10px; background: #DCE6F1; color: #2F528F;
+  padding: 2px 8px; border-radius: 20px; font-weight: 600;
+  letter-spacing: 0; text-transform: none;
+}
+.stp-card-title .tag.optional { background: #FFF2E8; color: #B85A00; }
+
+.drop-zone-m {
+  border: 2px dashed #D9E1EF; border-radius: 8px; padding: 28px 20px;
+  text-align: center; cursor: pointer; transition: all .18s;
+  position: relative; background: #F5F7FA;
+}
+.drop-zone-m:hover, .drop-zone-m.drag-over { border-color: #4472C4; background: #DCE6F1; }
+.drop-zone-m input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.drop-icon { width: 36px; height: 36px; background: #DCE6F1; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.drop-icon svg { width: 18px; height: 18px; stroke: #4472C4; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.drop-label { font-size: 14px; font-weight: 600; color: #1A2340; margin-bottom: 4px; }
+.drop-hint { font-size: 12px; color: #6B7799; }
+
+.file-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+.file-item { display: flex; align-items: center; gap: 10px; background: #F5F7FA; border: 1px solid #D9E1EF; border-radius: 7px; padding: 9px 14px; font-size: 13px; animation: slideIn .18s ease; }
+@keyframes slideIn { from { opacity:0; transform:translateY(-6px);} to {opacity:1;transform:translateY(0);} }
+.file-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.file-icon.xlsx, .file-icon.xls { background: #E8F5E0; color: #375623; }
+.file-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-size { font-size: 11px; color: #6B7799; flex-shrink: 0; }
+.file-status { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; flex-shrink: 0; }
+.file-status.ok      { background: #E8F5E0; color: #375623; }
+.file-status.err     { background: #FCEAEA; color: #C00000; }
+.file-status.reading { background: #EDF2FF; color: #4472C4; }
+.remove-btn { background: none; border: none; cursor: pointer; color: #6B7799; padding: 2px; border-radius: 4px; display: flex; align-items: center; transition: color .15s; flex-shrink: 0; }
+.remove-btn:hover { color: #C00000; }
+.remove-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-top: 16px; }
+.stat-box { background: #F5F7FA; border: 1px solid #D9E1EF; border-radius: 8px; padding: 14px 16px; text-align: center; }
+.stat-num { font-size: 28px; font-weight: 800; color: #2F528F; line-height: 1; margin-bottom: 4px; }
+.stat-label { font-size: 11px; color: #6B7799; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+.merge-btn { width: 100%; padding: 16px; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: .3px; }
+.merge-btn:disabled { background: #D9E1EF; color: #6B7799; cursor: not-allowed; }
+.merge-btn:not(:disabled) { background: #4472C4; color: #fff; box-shadow: 0 4px 16px rgba(68,114,196,.35); }
+.merge-btn:not(:disabled):hover { background: #2F528F; transform: translateY(-1px); }
+.merge-btn:not(:disabled):active { transform: translateY(0); }
+.merge-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.merge-btn-discount { margin-top: 10px; }
+.merge-btn-discount:disabled { background: #F0E9D6; color: #A8955A; cursor: not-allowed; }
+.merge-btn-discount:not(:disabled) { background: #C09000; color: #fff; box-shadow: 0 4px 16px rgba(192,144,0,.35); }
+.merge-btn-discount:not(:disabled):hover { background: #967000; transform: translateY(-1px); }
+.merge-btn-discount:not(:disabled):active { transform: translateY(0); }
+.merge-btn-reject { margin-top: 10px; }
+.merge-btn-reject:disabled { background: #F0DAD6; color: #B08A82; cursor: not-allowed; }
+.merge-btn-reject:not(:disabled) { background: #C0392B; color: #fff; box-shadow: 0 4px 16px rgba(192,57,43,.35); }
+.merge-btn-reject:not(:disabled):hover { background: #96281B; transform: translateY(-1px); }
+.merge-btn-reject:not(:disabled):active { transform: translateY(0); }
+.log-box { background: #1A2340; color: #A8C4E8; border-radius: 8px; padding: 16px 18px; font-family: 'Consolas','Courier New',monospace; font-size: 12px; line-height: 1.8; max-height: 200px; overflow-y: auto; margin-top: 16px; display: none; }
+.log-box.active { display: block; }
+.log-line { margin: 0; }
+.log-line.ok   { color: #7ED87E; }
+.log-line.warn { color: #FFD166; }
+.log-line.err  { color: #FF7B7B; }
+.log-line.info { color: #A8C4E8; }
+.success-banner { background: linear-gradient(135deg,#375623 0%,#4A7A30 100%); color: #fff; border-radius: 10px; padding: 20px 24px; display: none; align-items: center; gap: 16px; margin-top: 16px; animation: popIn .3s cubic-bezier(.34,1.56,.64,1); }
+@keyframes popIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.success-banner.active { display: flex; }
+.success-icon { font-size: 32px; flex-shrink: 0; }
+.success-text h3 { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.success-text p  { font-size: 13px; opacity: .85; }
+.progress-bar-wrap { height: 4px; background: #DCE6F1; border-radius: 4px; overflow: hidden; margin: 10px 0 0; display: none; }
+.progress-bar-wrap.active { display: block; }
+.progress-bar { height: 100%; background: #4472C4; border-radius: 4px; width: 0%; transition: width .3s ease; }
+.col-map-note { font-size: 12px; color: #6B7799; background: #FFFBF0; border: 1px solid #FFE8B0; border-radius: 7px; padding: 10px 14px; margin-top: 14px; line-height: 1.6; }
+.col-map-note strong { color: #B85A00; }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════
+   PAGE 4 — BATCH HEATMAP (Strip List)
+══════════════════════════════════════════════════ */
+#stp-page-batchhm {
+  background: #f4f5f7;
+  color: #202428;
+  min-height: calc(100vh - var(--stp-nav-h));
+  font-size: 14px;
+}
+#stp-page-batchhm * { box-sizing: border-box; }
+#stp-page-batchhm header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 18px;
+  border-bottom: 1px solid #d5d9df; background: #fff; color: #202428;
+}
+#stp-page-batchhm h1 { margin: 0; font-size: 18px; font-weight: 650; color: #202428; }
+#bhm-topStatus { min-height: 20px; color: #66707a; line-height: 1.45; font-size: 13px; }
+#stp-page-batchhm main {
+  display: grid;
+  grid-template-columns: 380px minmax(0,1fr);
+  min-height: calc(100vh - var(--stp-nav-h) - 57px);
+  background: #f4f5f7; color: #202428;
+}
+#stp-page-batchhm aside {
+  padding: 14px; border-right: 1px solid #d5d9df;
+  background: #fbfbfc; overflow: auto; color: #202428;
+}
+#stp-page-batchhm .stage { min-width: 0; padding: 14px; overflow: auto; background: #f0f2f5; }
+#stp-page-batchhm .group {
+  margin-bottom: 12px; padding: 14px;
+  border: 1px solid #d2d7dd; border-radius: 8px; background: #fff; color: #202428;
+}
+#stp-page-batchhm .group h2 { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #313840; }
+#stp-page-batchhm label { display: block; margin: 9px 0 5px; color: #66707a; font-size: 12px; }
+#stp-page-batchhm input[type="file"] { width: 100%; font-size: 13px; margin-bottom: 4px; }
+#stp-page-batchhm .status { min-height: 18px; color: #66707a; line-height: 1.45; font-size: 12px; margin-top: 5px; }
+#stp-page-batchhm .error { color: #a13b2f; }
+.bhm-param-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px;
+  margin-top: 8px;
+}
+.bhm-param-row {
+  display: flex; align-items: center; gap: 7px;
+  background: #f5f7fa; border: 1px solid #dde2e8;
+  border-radius: 6px; padding: 7px 10px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.bhm-param-row:hover { border-color: #1167a8; background: #edf4ff; }
+.bhm-param-row input[type="checkbox"] { margin: 0; accent-color: #1167a8; width: 15px; height: 15px; flex-shrink: 0; }
+.bhm-param-row span { font-size: 12px; font-weight: 600; color: #2d3748; }
+.bhm-sel-all { display: flex; gap: 8px; margin-bottom: 8px; }
+.bhm-sel-btn {
+  font-size: 11px; padding: 4px 10px; border: 1px solid #b0bac5;
+  border-radius: 5px; background: #fff; cursor: pointer; color: #4a5568;
+  transition: background .15s;
+}
+.bhm-sel-btn:hover { background: #edf4ff; border-color: #1167a8; color: #1167a8; }
+.bhm-file-list {
+  max-height: 140px; overflow-y: auto;
+  border: 1px solid #dde2e8; border-radius: 6px;
+  background: #f9fafb; margin-top: 6px; padding: 4px 0;
+}
+.bhm-file-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; font-size: 12px;
+  border-bottom: 1px solid #edf0f2;
+}
+.bhm-file-item:last-child { border-bottom: none; }
+.bhm-file-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.bhm-file-dot.ok { background: #27ae60; }
+.bhm-file-dot.wait { background: #adb5bd; }
+.bhm-file-dot.err { background: #e74c3c; }
+.bhm-file-name { flex: 1; color: #2d3748; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bhm-run-btn {
+  width: 100%; padding: 13px; border: none; border-radius: 8px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  background: #1167a8; color: #fff; letter-spacing: .2px;
+  transition: background .15s, opacity .15s; margin-top: 4px;
+}
+.bhm-run-btn:disabled { background: #b0bac5; cursor: not-allowed; }
+.bhm-run-btn:not(:disabled):hover { background: #0d5490; }
+.bhm-progress-wrap { height: 5px; background: #dde2e8; border-radius: 4px; overflow: hidden; margin-top: 10px; display: none; }
+.bhm-progress-wrap.show { display: block; }
+.bhm-progress-bar { height: 100%; background: #1167a8; border-radius: 4px; width: 0%; transition: width .25s ease; }
+.bhm-log {
+  background: #0d1117; color: #7dffb3; border-radius: 7px;
+  padding: 10px 12px; height: 130px; overflow-y: auto;
+  font-family: 'Menlo','Consolas',monospace; font-size: 11px; line-height: 1.7;
+  margin-top: 10px; border: 1px solid #2a3040;
+}
+.bhm-log .err { color: #ff7b7b; }
+.bhm-results-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.bhm-result-card {
+  background: #fff; border: 1px solid #d2d7dd; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.bhm-result-card-title {
+  background: #f0f2f5; border-bottom: 1px solid #d2d7dd;
+  padding: 8px 12px; font-size: 12px; font-weight: 700; color: #1a2340;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bhm-result-card canvas { display: block; width: 100%; height: auto; }
+.bhm-empty-stage {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 280px; color: #66707a; border: 1px dashed #b8c0c8;
+  border-radius: 8px; background: #fff; font-size: 14px; text-align: center;
+  padding: 24px; line-height: 1.7;
+}
+@media (max-width: 920px) {
+  #stp-page-batchhm main { grid-template-columns: 1fr; }
+  #stp-page-batchhm aside { border-right: 0; border-bottom: 1px solid #d5d9df; }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Strip Test Report Generator</h2>
+  <div class="subtitle">[模式：LoggerData 專用 | 分母：Input Die]</div>
+
+  <div class="drop-zone-r" id="dropZone">
+    <i data-lucide="file-spreadsheet"></i>
+    <p id="dropText">拖曳 Log xls/xlsx/zip 至此或點擊選取</p>
+    <input type="file" id="fileInput" multiple accept=".xls,.xlsx,.zip" style="display:none">
+  </div>
+
+  <div class="controls">
+    <button class="stp-btn" id="btnProcess" disabled><i data-lucide="play"></i> 解析數據</button>
+    <button class="stp-btn green" id="btnExport" disabled><i data-lucide="download"></i> 導出匯總表</button>
+    <button class="stp-btn" id="btnHeatmap" disabled style="background:#7c5cbf"><i data-lucide="grid-3x3"></i> Slot Heatmap</button>
+    <button class="stp-btn" id="btnAutoFailHeatmap" disabled style="background:#b5451b"><i data-lucide="flame"></i> 下載 Fail Heatmap</button>
+  </div>
+
+  <div class="log-area" id="logArea">準備就緒...</div>
+</div>
+
+<!-- Heatmap Modal -->
+<div class="modal-overlay" id="heatmapModal">
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h3 id="heatmapTitle">Slot Yield Heatmap</h3>
+    <div class="heatmap-wrap">
+      <div class="heatmap-grid" id="heatmapGrid"></div>
+    </div>
+    <div class="heatmap-legend">
+      <span class="legend-label">低</span>
+      <div class="legend-bar"></div>
+      <span class="legend-label">高 (100%)</span>
+      <span style="margin-left:16px;color:#aaa;font-size:11px;">紅 &lt;80% ｜ 橙 80-90% ｜ 黃 90-95% ｜ 綠 ≥95%</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 保護性初始化：lucide 可能因網路問題載入失敗，不可阻斷後續 JS ──
+try { if(typeof lucide !== 'undefined') lucide.createIcons(); } catch(e) {}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PAGE 1 — STRIP TEST REPORT GENERATOR
+// ══════════════════════════════════════════════════════════════════════════════
+const TARGET_SHEET = "LoggerData";
+const UNITS_PER_SLOT = 169; // legacy fixed denominator, no longer used — slot yield now uses pass/input die actually tested per strip
+const ROW_MIN=3, ROW_MAX=4, ROW_HEADER=9, ROW_DATA=10;
+const JUDGED_ITEMS=["VTH","VFSD","BVDSS 2","BVDSS 1","Delta3","IPD-10V","IDSS1","IDSS2","IDSS3"];
+const SLOTS=Array.from({length:24},(_,i)=>(i+1).toString().padStart(2,'0'));
+let finalResults=[], rptFiles=[], rptEntries=[];  // rptEntries: unpacked {name,data} list
+
+['dragenter','dragover','dragleave','drop'].forEach(e=>window.addEventListener(e,ev=>{ev.preventDefault();ev.stopPropagation();}));
+const dropZone=document.getElementById('dropZone');
+const stpFileInput=document.getElementById('fileInput');
+dropZone.onclick=()=>stpFileInput.click();
+dropZone.onmouseover=()=>dropZone.classList.add('active');
+dropZone.onmouseleave=()=>dropZone.classList.remove('active');
+const onFiles=(f)=>{
+  rptFiles=Array.from(f);
+  if(rptFiles.length){
+    document.getElementById('dropText').innerText=`已選取 ${rptFiles.length} 個檔案`;
+    document.getElementById('btnProcess').disabled=false;
+  }
+};
+stpFileInput.onchange=e=>onFiles(e.target.files);
+dropZone.ondrop=e=>onFiles(e.dataTransfer.files);
+
+function addLog(msg,isError=false){
+  const d=document.createElement('div');
+  if(isError)d.style.color="#ff6b6b";
+  d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;
+  const area=document.getElementById('logArea');
+  area.appendChild(d);area.scrollTop=area.scrollHeight;
+}
+function isExcelFile(n){return/\.(xls|xlsx)$/i.test(n);}
+function isZipFile(n){return/\.zip$/i.test(n);}
+function baseName(n){return n.replace(/^.*[\\\/]/,'').replace(/\.(xls|xlsx)$/i,'');}
+function getSheetName(wb,target){return wb.SheetNames.find(s=>s.trim().toLowerCase()===target.toLowerCase())||null;}
+function parseLimit(raw){if(raw===null||raw===undefined)return null;const m=String(raw).trim().match(/[-+]?\d*\.?\d+/);return m?Number(m[0]):null;}
+function toNumber(raw){if(raw===null||raw===undefined||raw==="")return null;if(typeof raw==="number")return Number.isFinite(raw)?raw:null;const n=Number(String(raw).trim().replace(/,/g,""));return Number.isFinite(n)?n:null;}
+function extractSubBatch(remark){if(remark===null||remark===undefined)return null;const parts=String(remark).trim().split(/\s+/).filter(Boolean);if(parts.length<2)return null;const code=parts[parts.length-1];return code.length>=2?code.slice(-2):null;}
+function formatFileTime(file){if(!file.lastModified)return "";const d=new Date(file.lastModified);const pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}${pad(d.getSeconds())}`;}
+function todayStr(){const d=new Date();const pad=n=>String(n).padStart(2,"0");return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;}
+
+async function collectExcelEntries(inputFiles){
+  const entries=[];
+  for(const file of inputFiles){
+    if(isExcelFile(file.name)){entries.push({name:file.name,data:await file.arrayBuffer(),lastModified:file.lastModified});continue;}
+    if(isZipFile(file.name)){
+      if(typeof JSZip==="undefined")throw new Error("JSZip not loaded.");
+      const zip=await JSZip.loadAsync(await file.arrayBuffer());
+      const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir&&isExcelFile(n));
+      if(!names.length)addLog(`跳過 [${file.name}]: zip 內沒有 xls/xlsx`,true);
+      for(const n of names){entries.push({name:n,data:await zip.files[n].async("arraybuffer"),lastModified:zip.files[n].date?zip.files[n].date.getTime():file.lastModified});}
+      continue;
+    }
+    addLog(`跳過 [${file.name}]: 不支援的檔案類型`,true);
+  }
+  return entries;
+}
+
+function parseWorkbook(entry){
+  const wb=XLSX.read(entry.data,{type:'array',cellDates:false});
+  const sheetName=getSheetName(wb,TARGET_SHEET);
+  if(!sheetName)throw new Error(`Sheet '${TARGET_SHEET}' not found.`);
+  const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:""});
+  if(rows.length<=ROW_HEADER)throw new Error("Insufficient rows.");
+  const headers=rows[ROW_HEADER].map(h=>String(h).trim());
+  const col={};
+  headers.forEach((h,i)=>{if(h&&col[h.toLowerCase()]===undefined)col[h.toLowerCase()]=i;});
+  const colIdx=name=>col[name.toLowerCase()];
+  const minRow=rows[ROW_MIN]||[],maxRow=rows[ROW_MAX]||[];
+  const limits={};
+  JUDGED_ITEMS.forEach(item=>{const ci=colIdx(item);if(ci!==undefined)limits[item]={min:parseLimit(minRow[ci]),max:parseLimit(maxRow[ci])};});
+  const vthCol=colIdx("VTH"),remarkCol=colIdx("Remark");
+  const failCounts={};JUDGED_ITEMS.forEach(it=>failCounts[it]=0);
+  const subPass={};
+  const subInput={};
+  let input=0,output=0,vthLt15=0,vthGt6=0;
+  for(let r=ROW_DATA;r<rows.length;r++){
+    const row=rows[r]||[];
+    if(String(row[0]??"").trim()==="")break;
+    input++;
+    const vth=vthCol!==undefined?toNumber(row[vthCol]):null;
+    if(vth!==null){if(vth<1.5)vthLt15++;if(vth>6.0)vthGt6++;}
+    let diePassed=true;
+    JUDGED_ITEMS.forEach(item=>{
+      const ci=colIdx(item),lim=limits[item];
+      if(ci===undefined||!lim)return;
+      const val=toNumber(row[ci]);
+      const failed=val===null||(lim.min!==null&&val<lim.min)||(lim.max!==null&&val>lim.max);
+      if(failed){failCounts[item]++;diePassed=false;}
+    });
+    if(diePassed)output++;
+    const sub=remarkCol!==undefined?extractSubBatch(row[remarkCol]):null;
+    if(sub){
+      if(subPass[sub]===undefined)subPass[sub]=0;
+      if(subInput[sub]===undefined)subInput[sub]=0;
+      subInput[sub]++;
+      if(diePassed)subPass[sub]++;
+    }
+  }
+  const subBatchYield={};
+  Object.entries(subPass).forEach(([slot,pass])=>{const denom=subInput[slot]||0;subBatchYield[slot]=denom>0?pass/denom:0;});
+  return{fileName:entry.name.replace(/^.*[\\\/]/,''),lotNo:baseName(entry.name),testDateTime:formatFileTime(entry),input,output,vthLt15,vthGt6,failCounts,subBatchYield};
+}
+
+document.getElementById('btnProcess').onclick=async()=>{
+  finalResults=[];
+  document.getElementById('btnExport').disabled=true;
+  document.getElementById('btnHeatmap').disabled=true;
+  document.getElementById('btnAutoFailHeatmap').disabled=true;
+  let entries=[];
+  try{entries=await collectExcelEntries(rptFiles);rptEntries=entries;}catch(err){addLog(`讀取失敗: ${err.message}`,true);return;}
+  for(const entry of entries){
+    try{const result=parseWorkbook(entry);finalResults.push(result);addLog(`成功: ${result.fileName} (Input:${result.input}, Output:${result.output})`);}
+    catch(err){addLog(`錯誤 [${entry.name}]: ${err.message}`,true);}
+  }
+  const ok=finalResults.length>0;
+  document.getElementById('btnExport').disabled=!ok;
+  document.getElementById('btnHeatmap').disabled=!ok;
+  document.getElementById('btnAutoFailHeatmap').disabled=!ok;
+};
+
+document.getElementById('btnExport').onclick=async()=>{
+  const wbEx=new ExcelJS.Workbook();
+  const ws=wbEx.addWorksheet('Summary');
+  const sorted=[...finalResults].sort((a,b)=>a.lotNo.localeCompare(b.lotNo,undefined,{sensitivity:"base"}));
+  const reportDate=new Date();
+  const headerArr=["Test Date/ Time","Report Date","Lot No.","Input","Output","Yield","VTH","","VTH < 1.5 V","","VTH > 6 V","","VFSD","","BVDSS 2","","BVDSS 1","","Delta3","","IPD-10V","","IDSS1","","IDSS2","","IDSS3","",...SLOTS];
+  const r1=ws.addRow(headerArr);
+  r1.eachCell(c=>{c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'4472C4'}};c.font={color:{argb:'FFFFFF'},bold:true};c.alignment={horizontal:'center',vertical:'middle',wrapText:true};c.border={bottom:{style:'thin',color:{argb:'2255A0'}}};});
+  [[7,8],[9,10],[11,12],[13,14],[15,16],[17,18],[19,20],[21,22],[23,24],[25,26],[27,28]].forEach(([f,t])=>{ws.mergeCells(1,f,1,t);});
+  for(let c=29;c<=52;c++){const cell=ws.getCell(1,c);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'70AD47'}};cell.font={color:{argb:'FFFFFF'},bold:true};cell.alignment={horizontal:'center'};}
+  const RED_FILL={type:'pattern',pattern:'solid',fgColor:{argb:'C00000'}};
+  const YEL_FONT={color:{argb:'FFFF00'},bold:true};
+  sorted.forEach((d,idx)=>{
+    const yieldVal=d.input>0?d.output/d.input:0;
+    const pair=count=>[count,d.input>0?count/d.input:0];
+    const rowData=[d.testDateTime,reportDate,d.lotNo,d.input,d.output,yieldVal,...pair(d.failCounts["VTH"]||0),...pair(d.vthLt15),...pair(d.vthGt6),...pair(d.failCounts["VFSD"]||0),...pair(d.failCounts["BVDSS 2"]||0),...pair(d.failCounts["BVDSS 1"]||0),...pair(d.failCounts["Delta3"]||0),...pair(d.failCounts["IPD-10V"]||0),...pair(d.failCounts["IDSS1"]||0),...pair(d.failCounts["IDSS2"]||0),...pair(d.failCounts["IDSS3"]||0),...SLOTS.map(s=>d.subBatchYield[s]!==undefined?d.subBatchYield[s]:"")];
+    const r=ws.addRow(rowData);
+    r.getCell(2).numFmt='yyyy/mm/dd';r.getCell(6).numFmt='0.00%';
+    for(let c=8;c<=28;c+=2)r.getCell(c).numFmt='0.00%';
+    for(let c=29;c<=52;c++)r.getCell(c).numFmt='0.00%';
+    if(idx%2===0){r.eachCell({includeEmpty:true},c=>{if(!c.fill||c.fill.pattern==='none'){c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'DCE6F1'}};}});}
+    const yieldCell=r.getCell(6);
+    if(yieldVal<0.90){yieldCell.fill=RED_FILL;yieldCell.font=YEL_FONT;}
+    const pctCols=[8,10,12,14,16,18,20,22,24,26,28];
+    pctCols.forEach(ci=>{const cell=r.getCell(ci);const val=cell.value;if(typeof val==="number"&&val>0.01){cell.fill=RED_FILL;cell.font=YEL_FONT;}});
+    for(let c=29;c<=52;c++){const cell=r.getCell(c);const v=cell.value;if(typeof v==="number"){let argb,bold;if(v<0.75){argb='FFC00000';bold=true;}else if(v<0.90){argb='FFFFFF00';bold=true;}else{argb='FF27AE60';bold=false;}cell.fill={type:'pattern',pattern:'solid',fgColor:{argb}};cell.font={color:{argb:'FF000000'},bold:bold};}}
+  });
+  ws.columns.forEach((c,i)=>{if(i===0||i===1)c.width=14;else if(i===2)c.width=24;else c.width=i>=28?8:10;});
+  ws.views=[{state:'frozen',ySplit:1}];
+  ws.autoFilter={from:'A1',to:'AZ1'};
+  const buf=await wbEx.xlsx.writeBuffer();
+  const blob=new Blob([buf]);const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`StripTest_Report_${todayStr()}.xlsx`;a.click();
+};
+
+function slotColor(v){if(v===null||v===undefined||v==="")return null;if(v<0.80)return{bg:'#c0392b',fg:'#fff'};if(v<0.90)return{bg:'#e67e22',fg:'#fff'};if(v<0.95)return{bg:'#c9a800',fg:'#000'};return{bg:'#27ae60',fg:'#fff'};}
+
+// ── AUTO FAIL HEATMAP DOWNLOAD ──────────────────────────────────────────────
+// Rule: for a whole lot, if ANY strip yield < 90%, output ONE heatmap for the
+// entire lot. The heatmap does not distinguish by test item — each die is
+// simply Pass (green) / Fail (red) / Untested (white).
+const STRIP_FAIL_THRESHOLD=0.90;
+const HM_PASS_COLOR=[39,174,96];     // green
+const HM_FAIL_COLOR=[192,57,43];     // red
+const HM_UNTESTED_COLOR=[255,255,255]; // white
+
+// Off-screen canvas used for batch heatmap rendering — whole-lot pass/fail map
+function autoHmRenderLotToCanvas(csvText, lotName){
+  // Parse CSV
+  const parsed=hmParseCsv(csvText);
+  const headers=parsed.headers;
+  const rows=parsed.rows;
+  const idxOf=name=>headers.findIndex(h=>h.toLowerCase()===name.toLowerCase());
+  const idxX=idxOf("X"),idxY=idxOf("Y"),idxWafer=idxOf("Wafer_ID");
+  // Prefer the recomputed DiePass column (judged from measured values vs. limits, same rule as the
+  // summary yield). Fall back to raw Bin===1 only for older CSVs that predate this column.
+  const idxDiePass=idxOf("DiePass");
+  const idxBin=idxOf("Bin");
+  if((idxDiePass<0&&idxBin<0)||idxX<0||idxY<0||idxWafer<0) return null;
+
+  // Build wafers (strips) map with pass/fail per die
+  const wafers=new Map();
+  for(const cols of rows){
+    const x=parseInt(cols[idxX]||"",10);
+    const y=parseInt(cols[idxY]||"",10);
+    const wid=parseInt(cols[idxWafer]||"",10);
+    if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(wid))continue;
+    let pass;
+    if(idxDiePass>=0){
+      pass=parseInt(cols[idxDiePass]||"",10)===1;
+    }else{
+      const bin=parseInt(cols[idxBin]||"",10);
+      if(!Number.isFinite(bin))continue;
+      pass=bin===1;
+    }
+    if(!wafers.has(wid))wafers.set(wid,[]);
+    wafers.get(wid).push({X:x,Y:y,Pass:pass});
+  }
+  if(!wafers.size)return null;
+
+  const allDies=[...wafers.values()].flat();
+  const maxX=allDies.length?Math.max(...allDies.map(d=>d.X)):13;
+  const maxY=allDies.length?Math.max(...allDies.map(d=>d.Y)):13;
+  const cellW=28,cellH=18;
+  const TITLE_H=80,WAFER_LABEL_H=18,WAFER_PAD_X=10,WAFER_PAD_Y=14,MARGIN=20,COLS=4,GRID_ROWS=6;
+  const waferW=maxX*cellW,waferH=maxY*cellH;
+  const totalW=MARGIN*2+COLS*waferW+(COLS-1)*WAFER_PAD_X;
+  const totalH=MARGIN*2+TITLE_H+GRID_ROWS*(WAFER_LABEL_H+waferH)+(GRID_ROWS-1)*WAFER_PAD_Y;
+
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.ceil(totalW);canvas.height=Math.ceil(totalH);
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,totalW,totalH);ctx.imageSmoothingEnabled=false;
+
+  const title=`${lotName} Fail Heatmap`;
+  ctx.fillStyle="#0050c8";ctx.font="700 34px Arial";ctx.textAlign="center";ctx.textBaseline="middle";
+  ctx.fillText(title,totalW/2,TITLE_H/2);
+  ctx.font="700 11px Arial";ctx.textAlign="left";ctx.textBaseline="top";
+
+  for(let gridCol=0;gridCol<COLS;gridCol++){
+    for(let gridRow=0;gridRow<GRID_ROWS;gridRow++){
+      const baseId=gridCol*GRID_ROWS+1;const wid=baseId+(GRID_ROWS-1-gridRow);
+      const ox=MARGIN+gridCol*(waferW+WAFER_PAD_X);let oy=MARGIN+TITLE_H+gridRow*(WAFER_LABEL_H+waferH+WAFER_PAD_Y);
+      ctx.fillStyle="#000";ctx.fillText(`#${wid}`,ox,oy+2);oy+=WAFER_LABEL_H;
+      const list=wafers.get(wid);if(!list)continue;
+      const lookup=new Map(list.map(d=>[`${d.X},${d.Y}`,d]));
+      for(let dy=maxY;dy>=1;dy--){
+        for(let dx=1;dx<=maxX;dx++){
+          const px=ox+(dx-1)*cellW,py=oy+(maxY-dy)*cellH;
+          const die=lookup.get(`${dx},${dy}`);
+          const color=die?(die.Pass?HM_PASS_COLOR:HM_FAIL_COLOR):HM_UNTESTED_COLOR;
+          ctx.fillStyle=`rgb(${color[0]},${color[1]},${color[2]})`;
+          ctx.fillRect(px,py,Math.max(1,cellW-1),Math.max(1,cellH-1));
+          ctx.strokeStyle="#ccc";ctx.lineWidth=1;
+          ctx.strokeRect(px+0.5,py+0.5,Math.max(1,cellW-1),Math.max(1,cellH-1));
+        }
+      }
+    }
+  }
+  return canvas;
+}
+
+function canvasToPngBlob(canvas){
+  return new Promise(resolve=>{
+    canvas.toBlob(blob=>resolve(blob),"image/png");
+  });
+}
+
+document.getElementById('btnAutoFailHeatmap').onclick=async()=>{
+  const btn=document.getElementById('btnAutoFailHeatmap');
+  btn.disabled=true;btn.textContent="處理中...";
+
+  try{
+    // 1. Identify lots where ANY strip (subBatchYield) has yield < 90%
+    const failedLotKeys=new Set();
+    for(const d of finalResults){
+      const lotKey=d.lotNo||d.fileName||"unknown";
+      const hasLowStrip=Object.values(d.subBatchYield||{}).some(y=>y<STRIP_FAIL_THRESHOLD);
+      if(hasLowStrip) failedLotKeys.add(lotKey);
+    }
+
+    if(failedLotKeys.size===0){
+      alert("所有 lot 的每一條 strip 良率均 ≥ 90%，無需產生 Heatmap。");
+      btn.disabled=false;btn.textContent="下載 Fail Heatmap";
+      return;
+    }
+
+    addLog(`偵測到至少一條 strip 良率 < 90% 的 lot：${[...failedLotKeys].join(", ")}`);
+
+    // 2. Convert each raw XLS file that belongs to a flagged lot to CSV, then render ONE whole-lot heatmap
+    const zip=new JSZip();
+    let pngCount=0;
+
+    for(const entry of rptEntries){
+      // Determine which lot this entry belongs to
+      const lotName=entry.name.replace(/^.*[\\/]/,"").replace(/\.[^.]+$/,"");
+
+      // Find the matching finalResult to know if this lot was flagged
+      const result=finalResults.find(r=>
+        (r.lotNo||"")===lotName ||
+        (r.fileName||"").replace(/\.[^.]+$/,"")=== lotName
+      );
+      if(!result)continue;
+
+      const lotKey=result.lotNo||result.fileName||"unknown";
+      if(!failedLotKeys.has(lotKey))continue;
+
+      // Convert XLS → CSV using Page 2's existing parser
+      let csvText;
+      try{
+        csvText=hmConvertXlsArrayBuffer(entry.data);
+      }catch(err){
+        addLog(`[警告] ${entry.name} 無法轉換 CSV: ${err.message}`,true);
+        continue;
+      }
+
+      // Render ONE pass/fail heatmap for the whole lot (all test items combined)
+      try{
+        const canvas=autoHmRenderLotToCanvas(csvText,lotName);
+        if(!canvas){addLog(`[警告] ${lotName} 無法渲染 heatmap`,true);continue;}
+        const blob=await canvasToPngBlob(canvas);
+        zip.file(`${lotName}_FailHeatmap.png`,blob);
+        pngCount++;
+        addLog(`  ✓ ${lotName} heatmap`);
+      }catch(err){
+        addLog(`[警告] ${lotName} 渲染失敗: ${err.message}`,true);
+      }
+    }
+
+    if(pngCount===0){
+      alert("無法從 XLS 產生任何 heatmap（可能 rptFiles 中沒有 .xls 格式的原始資料）。");
+      btn.disabled=false;btn.textContent="下載 Fail Heatmap";
+      return;
+    }
+
+    // 3. Pack & download zip
+    const zipBlob=await zip.generateAsync({type:"blob"});
+    const url=URL.createObjectURL(zipBlob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`FailHeatmap_${todayStr()}.zip`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    addLog(`✅ 已產生 ${pngCount} 張 heatmap，打包下載 FailHeatmap_${todayStr()}.zip`);
+
+  }catch(err){
+    addLog(`Fail Heatmap 失敗: ${err.message}`,true);
+  }finally{
+    btn.disabled=false;btn.textContent="下載 Fail Heatmap";
+    document.getElementById('btnAutoFailHeatmap').disabled=finalResults.length===0;
+  }
+};
+
+document.getElementById('btnHeatmap').onclick=()=>{
+  const grid=document.getElementById('heatmapGrid');
+  const modal=document.getElementById('heatmapModal');
+  const title=document.getElementById('heatmapTitle');
+  grid.innerHTML="";
+  const slotSums={},slotCounts={};
+  SLOTS.forEach(s=>{slotSums[s]=0;slotCounts[s]=0;});
+  finalResults.forEach(d=>{SLOTS.forEach(s=>{const v=d.subBatchYield[s];if(typeof v==="number"){slotSums[s]+=v;slotCounts[s]++;}});});
+  const sorted=[...finalResults].sort((a,b)=>a.lotNo.localeCompare(b.lotNo,undefined,{sensitivity:"base"}));
+  title.textContent=`Slot Yield Heatmap — ${finalResults.length} Lots (平均良率)`;
+  SLOTS.forEach((s)=>{
+    const avg=slotCounts[s]>0?slotSums[s]/slotCounts[s]:null;
+    const col=slotColor(avg);
+    const cell=document.createElement('div');
+    cell.className='heatmap-cell'+(avg===null?' heatmap-empty':'');
+    if(col){cell.style.background=col.bg;cell.style.color=col.fg;}
+    const ttLines=sorted.map(d=>{const v=d.subBatchYield[s];const pct=typeof v==="number"?(v*100).toFixed(1)+"%":"—";return `${d.lotNo}: ${pct}`;}).join('\n');
+    cell.title=`Slot ${s}\n${ttLines}`;
+    cell.innerHTML=`<span class="slot-id">Slot ${s}</span><span class="slot-val">${avg!==null?(avg*100).toFixed(1)+'%':'—'}</span>`;
+    grid.appendChild(cell);
+  });
+  modal.classList.add('open');
+};
+document.getElementById('modalClose').onclick=()=>{document.getElementById('heatmapModal').classList.remove('open');};
+document.getElementById('heatmapModal').onclick=function(e){if(e.target===this)this.classList.remove('open');};
+
+
+// ── Helper functions for Fail Heatmap XLS→CSV conversion (shared with Strip Heatmap page) ──
+function hmConvertXlsArrayBuffer(buffer){
+  const raw=new Uint8Array(buffer);
+  const wb=hmExtractWorkbookStream(raw);
+  if(!wb)throw new Error("無法解析 OLE Compound Document，請確認為標準 .xls 格式。");
+  const sst=[];
+  const ldOffset=hmFindLoggerDataOffset(wb,sst);
+  if(ldOffset<0)throw new Error("找不到 LoggerData 分頁，請確認 XLS 格式。");
+  const allRows=hmParseSheetRows(wb,ldOffset,sst);
+  const minRow=allRows.get(3)||new Map();
+  const maxRow=allRows.get(4)||new Map();
+  const lim={vthLo:hmGetD(minRow,4,1.5),vthHi:hmGetD(maxRow,4,6.0),vfsdLo:hmGetD(minRow,7,0.4),vfsdHi:hmGetD(maxRow,7,0.9),bv2Lo:hmGetD(minRow,8,19.65),bv2Hi:hmGetD(maxRow,8,23.0),bv1Lo:hmGetD(minRow,9,19.65),bv1Hi:hmGetD(maxRow,9,22.5),deltaLo:hmGetD(minRow,10,0.02),deltaHi:hmGetD(maxRow,10,2.0),ipdLo:hmGetD(minRow,11,20.0),ipdHi:hmGetD(maxRow,11,40.0),idss:hmGetD(maxRow,12,10.0)};
+  const out=["Serial,Bin,X,Y,X_old,Y_old,VTH,GET VTH <1.5V,GET VTH >6V,VFSD,BVDSS_2,BVDSS_1,Delta3,IPD_10V,IDSS1,IDSS2,IDSS3,BVDSS_bin1,BVDSS_bin2,Wafer_ID,DiePass"];
+  let globalSerial=0;let converted=0;
+  const rowIndexes=[...allRows.keys()].sort((a,b)=>a-b);
+  for(const rowIdx of rowIndexes){
+    if(rowIdx<10)continue;
+    const row=allRows.get(rowIdx);
+    const remark=hmGetS(row,17);if(!remark.trim())continue;
+    let waferStr=remark.trim();if(waferStr.length>=2)waferStr=waferStr.slice(-2);
+    const waferId=parseInt(waferStr,10);if(!Number.isFinite(waferId))continue;
+    globalSerial++;
+    const xOldObj=row.get(2);const xOld=typeof xOldObj==="number"?Math.trunc(xOldObj):0;if(xOld<=0)continue;
+    const x=Math.trunc((xOld+12)/13);const y=13-((xOld-1)%13);
+    const serialObj=row.get(0);const serial=typeof serialObj==="number"?Math.trunc(serialObj):globalSerial;
+    const vth=hmFmtD(row,4);const gtvLo=hmFmtD(row,5);const gtvHi=hmFmtD(row,6);const vfsd=hmFmtD(row,7);const bv2=hmFmtD(row,8);const bv1=hmFmtD(row,9);const delta=hmFmtD(row,10);const ipd=hmFmtD(row,11);const idss1=hmFmtD(row,12);const idss2=hmFmtD(row,13);const idss3=hmFmtD(row,14);const bvBin1=hmFmtD(row,15);const bvBin2=hmFmtD(row,16);
+    const binObj=row.get(1);const bin=typeof binObj==="number"?Math.trunc(binObj):hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim);
+    // DiePass is judged from the actual measured values against limits (same rule as the summary yield),
+    // NOT from the raw factory Bin code. The raw Bin scheme can use more than one "pass" bin (e.g. 1 and 2),
+    // so treating "Bin !== 1" as fail mis-flags large numbers of good die.
+    const diePass=hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim)===1?1:0;
+    out.push([serial,bin,x,y,xOld,0,vth,gtvLo,gtvHi,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,bvBin1,bvBin2,waferId,diePass].join(","));converted++;
+  }
+  if(!converted)throw new Error("LoggerData 中沒有可轉換的量測資料。");
+  return out.join("\r\n")+"\r\n";
+}
+
+function hmExtractWorkbookStream(raw){
+  if(raw.length<512)return null;
+  const view=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
+  const secSize=1<<view.getInt16(30,true);
+  const fatSectors=[];
+  for(let i=0;i<109;i++){const sec=view.getInt32(76+i*4,true);if(sec<0)break;fatSectors.push(sec);}
+  const fat=new Int32Array(fatSectors.length*secSize/4);
+  for(let fi=0;fi<fatSectors.length;fi++){const off=512+fatSectors[fi]*secSize;for(let j=0;j<secSize/4;j++){if(off+j*4+4<=raw.length)fat[fi*secSize/4+j]=view.getInt32(off+j*4,true);}}
+  const dirSec=view.getInt32(48,true);const dirOff=512+dirSec*secSize;let wbStart=-1;
+  for(let e=0;e<32;e++){
+    const entryOff=dirOff+e*128;if(entryOff+128>raw.length)break;
+    const nameLen=view.getInt16(entryOff+64,true);const entType=raw[entryOff+66];if(entType===0)continue;
+    const startSec=view.getInt32(entryOff+116,true);let name="";
+    if(nameLen>0&&nameLen<=64)name=hmDecodeUtf16(raw.slice(entryOff,entryOff+nameLen)).replace(/\0+$/g,"");
+    if(name.toLowerCase()==="workbook"||name.toLowerCase()==="book"){wbStart=startSec;break;}
+  }
+  if(wbStart<0)return null;
+  const chunks=[];let total=0;let cur=wbStart;const visited=new Set();
+  while(cur>=0&&cur<0x7ffffff0){if(visited.has(cur))break;visited.add(cur);const off=512+cur*secSize;if(off+secSize>raw.length)break;const chunk=raw.slice(off,off+secSize);chunks.push(chunk);total+=chunk.length;if(cur>=fat.length)break;cur=fat[cur];}
+  const wbArr=new Uint8Array(total);let p=0;for(const chunk of chunks){wbArr.set(chunk,p);p+=chunk.length;}
+  return wbArr;
+}
+
+function hmFindLoggerDataOffset(wb,sst){
+  const view=new DataView(wb.buffer,wb.byteOffset,wb.byteLength);
+  const sheets=[];let pos=0;
+  while(pos<wb.length-4){
+    const rt=view.getUint16(pos,true);const rl=view.getUint16(pos+2,true);const data=pos+4;const boundary=data+rl;
+    if(rt===0x00fc&&rl>=8){
+      const unique=view.getInt32(data+4,true);let sp=data+8;
+      while(sst.length<unique&&sp+3<=boundary){
+        const cc=view.getUint16(sp,true);const fl=wb[sp+2];sp+=3;let richCount=0;
+        if((fl&0x08)!==0&&sp+2<=boundary){richCount=view.getUint16(sp,true);sp+=2;}
+        if((fl&0x04)!==0&&sp+4<=boundary){const ph=view.getInt32(sp,true);sp+=4+ph;}
+        if((fl&0x01)===0){const end=Math.min(sp+cc,boundary);sst.push(hmDecodeLatin1(wb.slice(sp,end)));sp+=cc;}
+        else{const end=Math.min(sp+cc*2,boundary);sst.push(hmDecodeUtf16(wb.slice(sp,end)));sp+=cc*2;}
+        sp+=richCount*4;
+      }
+    }
+    if(rt===0x0085&&rl>=7){
+      const sheetOffset=view.getInt32(data,true);const nameLen=wb[data+6];const enc=wb[data+7];const nameStart=data+8;
+      const name=enc===0?hmDecodeLatin1(wb.slice(nameStart,Math.min(nameStart+nameLen,boundary))):hmDecodeUtf16(wb.slice(nameStart,Math.min(nameStart+nameLen*2,boundary)));
+      sheets.push({name:name.replace(/\0+$/g,""),offset:sheetOffset});
+    }
+    pos+=4+rl;
+  }
+  const logger=sheets.find(s=>s.name.toLowerCase()==="loggerdata");
+  if(logger)return logger.offset;
+  return sheets.length?sheets[sheets.length-1].offset:-1;
+}
+
+function hmParseSheetRows(wb,startOffset,sst){
+  const view=new DataView(wb.buffer,wb.byteOffset,wb.byteLength);
+  const parsed=new Map();
+  const setCell=(r,c,v)=>{if(!parsed.has(r))parsed.set(r,new Map());parsed.get(r).set(c,v);};
+  let pos=startOffset;let started=false;
+  while(pos<wb.length-4){
+    const rt=view.getUint16(pos,true);const rl=view.getUint16(pos+2,true);const data=pos+4;
+    if(rt===0x0809){if(started)break;started=true;}
+    if(started){
+      if(rt===0x0203&&rl>=14){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const v=view.getFloat64(data+6,true);setCell(r,c,v);}
+      else if(rt===0x00fd&&rl>=10){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const si=view.getInt32(data+6,true);setCell(r,c,si<sst.length?sst[si]:"");}
+      else if(rt===0x027e&&rl>=10){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const rkv=view.getInt32(data+6,true);setCell(r,c,hmDecodeRK(rkv));}
+      else if(rt===0x00bd&&rl>=6){const r=view.getUint16(data,true);const cFirst=view.getUint16(data+2,true);const nCells=Math.floor((rl-6)/6);for(let i=0;i<nCells;i++){const rkOff=data+4+i*6+2;if(rkOff+4<=data+rl)setCell(r,cFirst+i,hmDecodeRK(view.getInt32(rkOff,true)));}}
+      else if(rt===0x0204&&rl>=9){const r=view.getUint16(data,true);const c=view.getUint16(data+2,true);const cch=view.getUint16(data+6,true);const grbit=wb[data+8];let str;if((grbit&0x01)!==0){const end=Math.min(data+9+cch*2,pos+4+rl);str=hmDecodeUtf16(wb.slice(data+9,end));}else{const end=Math.min(data+9+cch,pos+4+rl);str=hmDecodeLatin1(wb.slice(data+9,end));}setCell(r,c,str);}
+      else if(rt===0x000a){break;}
+    }
+    pos+=4+rl;
+  }
+  return parsed;
+}
+
+function hmDecodeRK(rkv){let v;if((rkv&0x02)!==0){v=rkv>>2;}else{const buf=new ArrayBuffer(8);const dv=new DataView(buf);dv.setUint32(0,0,true);dv.setUint32(4,rkv&0xfffffffc,true);v=dv.getFloat64(0,true);}if((rkv&0x01)!==0)v/=100;return v;}
+function hmGetD(row,colIndex,fallback){if(!row.has(colIndex))return fallback;const value=row.get(colIndex);if(typeof value==="number")return value;const text=String(value??"").trim().replace(/[^\d.\-+eE].*$/,"");const parsed=Number(text);return Number.isFinite(parsed)?parsed:fallback;}
+function hmGetS(row,colIndex){return row.has(colIndex)?String(row.get(colIndex)??""):"";}
+function hmFmtD(row,colIndex){if(!row.has(colIndex))return "";const value=row.get(colIndex);return typeof value==="number"?hmFormatG(value,6):"";}
+function hmCalcBin(vth,vfsd,bv2,bv1,delta,ipd,idss1,idss2,idss3,lim){const dVth=Number(vth),dVfsd=Number(vfsd),dBv2=Number(bv2),dBv1=Number(bv1),dDelta=Number(delta),dIpd=Number(ipd),dI1=Number(idss1),dI2=Number(idss2),dI3=Number(idss3);if(![dVth,dVfsd,dBv2,dBv1,dDelta,dIpd,dI1,dI2,dI3].every(Number.isFinite))return 6;if(dIpd<lim.ipdLo||dIpd>lim.ipdHi)return 5;if(dVfsd<lim.vfsdLo||dVfsd>lim.vfsdHi)return 3;if(dVth<lim.vthLo||dVth>lim.vthHi)return 6;if(dBv2<lim.bv2Lo||dBv2>lim.bv2Hi)return 6;if(dBv1<lim.bv1Lo||dBv1>lim.bv1Hi)return 6;if(dDelta<lim.deltaLo||dDelta>lim.deltaHi)return 6;if(dI1>lim.idss||dI2>lim.idss||dI3>lim.idss)return 6;if(dI1<0||dI2<0||dI3<0)return 6;return 1;}
+function hmDecodeUtf16(bytes){return new TextDecoder("utf-16le").decode(bytes);}
+function hmDecodeLatin1(bytes){return new TextDecoder("windows-1252").decode(bytes);}
+
+async function hmLoadCsv(event){
+  const file=event.target.files&&event.target.files[0];if(!file)return;
+  try{
+    const text=await file.text();hmCsvBase=file.name.replace(/\.[^.]+$/,"");
+    const parsed=hmParseCsv(text);stpHmHeaders=parsed.headers;hmRows=parsed.rows;
+    hmBuildData();hmPopulateParams();hmApplyParamDefaults();
+    const dieCount=[...hmWafers.values()].reduce((sum,list)=>sum+list.length,0);
+    const msg=`已載入 ${hmWafers.size} 片 strip，共 ${dieCount.toLocaleString()} 個 die。`;
+    stpHmEls.fileStatus.textContent=msg;stpHmEls.fileStatus.className="status";
+    stpHmEls.topStatus.textContent=`${file.name} | ${msg}`;
+    hmEnableControls(true);hmRenderIfReady(true);
+  }catch(err){
+    stpHmHeaders=[];hmRows=[];hmWafers=new Map();hmFullDies=[];hmEnableControls(false);
+    stpHmEls.fileStatus.textContent=`Error: ${err.message}`;stpHmEls.fileStatus.className="status error";
+    stpHmEls.topStatus.textContent="CSV 讀取失敗。";
+  }
+}
+
+function hmParseCsv(text){
+  const parsedRows=[];let row=[];let cell="";let inQuotes=false;
+  const src=text.replace(/^\uFEFF/,"");
+  for(let i=0;i<src.length;i++){
+    const ch=src[i];
+    if(inQuotes){if(ch==='"'&&src[i+1]==='"'){cell+='"';i++;}else if(ch==='"')inQuotes=false;else cell+=ch;}
+    else if(ch==='"')inQuotes=true;
+    else if(ch===","){row.push(cell);cell="";}
+    else if(ch==="\n"){row.push(cell.replace(/\r$/,""));parsedRows.push(row);row=[];cell="";}
+    else{cell+=ch;}
+  }
+  if(cell.length||row.length){row.push(cell.replace(/\r$/,""));parsedRows.push(row);}
+  const nonEmpty=parsedRows.filter(r=>r.some(v=>String(v).trim()!==""));
+  if(!nonEmpty.length)throw new Error("CSV 為空。");
+  return{headers:nonEmpty[0].map(h=>h.trim()),rows:nonEmpty.slice(1)};
+}
+
+function hmBuildData(){
+  // 註：此為預留/未接線的函式（頁面上沒有對應的 CSV 載入 UI 呼叫它），
+  // 保留空函式主體僅為修正原檔案中遺漏的右大括號所導致的 JS 語法錯誤。
+}
+
+function hmFormatG(value,digits){if(!Number.isFinite(value))return "";return Number(value.toPrecision(digits)).toString();}
+
+</script>
+</body>
+</html>
